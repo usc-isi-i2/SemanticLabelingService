@@ -16,22 +16,78 @@ api = swagger.docs(Api(app), apiVersion='0.2', basePath='/', resourcePath='/', p
 CORS(app)
 
 
-class Test(Resource):
-    @swagger.operation(
-        title="mehmeh",
-        notes="Meh",
-        responseMessages=[
-            {
-                "code": 246,
-                "message": "Worked"
-            }
-        ]
-    )
+class SemanticTypes(Resource):
     def get(self):
-        return message("Yay", 246)
+        return
 
 
-api.add_resource(Test, '/test')
+    def post(self):
+        return
+
+
+    def delete(self):
+        return
+
+
+class SemanticTypeColumns(Resource):
+    def get(self):
+        return
+
+
+    def post(self):
+        return
+
+
+    def delete(self):
+        return
+
+
+class SemanticTypeColumnData(Resource):
+    def get(self):
+        return
+
+
+    def post(self):
+        return
+
+
+    def put(self):
+        return
+
+
+    def delete(self):
+        return
+
+
+class Predict(Resource):
+    def get(self):
+        return
+
+
+class Models(Resource):
+    def get(self):
+        return
+
+
+    def post(self):
+        return
+
+
+    def delete(self):
+        return
+
+
+class ModelData(Resource):
+    def post(self):
+        return
+
+
+api.add_resource(SemanticTypes, '/semantic_types')
+api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
+api.add_resource(SemanticTypeColumnData, '/semantic_types/<string:type_id>/<string:column_id>')
+api.add_resource(Predict, '/predict')
+api.add_resource(Models, '/models')
+api.add_resource(ModelData, '/models/<string:model_id>')
 
 if __name__ == '__main__':
     app.run(debug=True, port=config.PORT, use_reloader=False)
