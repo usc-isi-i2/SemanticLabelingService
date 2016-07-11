@@ -19,14 +19,14 @@ CORS(app)
 
 class parameters(object):
     @staticmethod
-    def type_id(required=False, multiple=True):
+    def type_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": "type_id",
-            "description": "Id of the semantic type",
+            "name": "type_ids" if multiple else "type_id",
+            "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
             "required": required,
             "allowMultiple": multiple,
             "dataType": "string",
-            "paramType": "query"
+            "paramType": param_type
         }
 
 
@@ -67,14 +67,74 @@ class parameters(object):
 
 
     @staticmethod
-    def column_names(required=False, desc="List of column names which the semantic type(s) should have"):
+    def source_names(required=False, desc="List of source names that the column(s) should have", multiple=True):
         return {
-            "name": "columnNames",
+            "name": "sourceColumns" if multiple else "sourceColumn",
+            "description": desc,
+            "required": required,
+            "allowMultiple": multiple,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def column_names(required=False, desc="List of column names which the semantic type(s) should have", multiple=True):
+        return {
+            "name": "columnNames" if multiple else "columnName",
+            "description": desc,
+            "required": required,
+            "allowMultiple": multiple,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def column_ids(required=False, desc="List of column ids which the semantic type(s) should have"):
+        return {
+            "name": "columnIds",
             "description": desc,
             "required": required,
             "allowMultiple": True,
             "dataType": "string",
             "paramType": "query"
+        }
+
+
+    @staticmethod
+    def models(required=False, desc="List of models which the column(s) should have", multiple=True):
+        return {
+            "name": "models" if multiple else "model",
+            "description": desc,
+            "required": required,
+            "allowMultiple": multiple,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def return_column_data(desc="If the data in the columns should be in the return body"):
+        return {
+            "name": "returnColumnData",
+            "description": desc,
+            "required": False,
+            "allowMultiple": False,
+            "dataType": "boolean",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def body(required=False):
+        return {
+            "name": "body",
+            "description": "List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones",
+            "required": required,
+            "allowMultiple": False,
+            "dataType": 'string',
+            "paramType": "body"
         }
 
 
@@ -114,7 +174,10 @@ class SemanticTypes(Resource):
             parameters.class_(),
             parameters.property(),
             parameters.namespaces(),
+            parameters.source_names(),
             parameters.column_names(),
+            parameters.column_ids(),
+            parameters.models(),
             {
                 "name": "returnColumns",
                 "description": "If the columns for the semantic type(s) should be in the return body",
@@ -123,14 +186,7 @@ class SemanticTypes(Resource):
                 "dataType": "boolean",
                 "paramType": "query"
             },
-            {
-                "name": "returnColumnData",
-                "description": "If the data in the columns for the semantic type(s) should be in the return body, if this is true it will override returnColumns",
-                "required": False,
-                "allowMultiple": False,
-                "dataType": "boolean",
-                "paramType": "query"
-            }
+            parameters.return_column_data("If the data in the columns should be in the return body, if this is true it will override returnColumns")
         ],
         responseMessages=responses.standard_get()
     )
@@ -139,7 +195,7 @@ class SemanticTypes(Resource):
         Get semantic types
         Returns all of the semantic types which fit the given parameters.
 
-        Returned body will have the format, but if returnColumns or returnColumnData is not given as true, then "columns" will be omitted and if returnDataColumns is not given as true "data" will be omitted:
+        Returned body will have the following format, but if returnColumns or returnColumnData is not given as true, then "columns" will be omitted and if returnDataColumns is not given as true "data" will be omitted:
         <pre>
         [
             {
@@ -190,6 +246,8 @@ class SemanticTypes(Resource):
             parameters.property(),
             parameters.namespaces(),
             parameters.column_names(),
+            parameters.column_ids(),
+            parameters.models(),
             {
                 "name": "deleteAll",
                 "description": "Set this to true to delete all semantic types",
@@ -204,21 +262,90 @@ class SemanticTypes(Resource):
     def delete(self):
         """
         Delete a semantic type
-        Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned and if deleteAll is true, all semantic types will be deleted regardless of other parameters.
+        Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
         """
         return
 
 
 class SemanticTypeColumns(Resource):
-    def get(self):
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(desc="The ids of the column(s) to be returned"),
+            parameters.source_names(),
+            parameters.column_names(desc="The names of the column(s) to be returned"),
+            parameters.models(),
+            parameters.return_column_data()
+        ],
+        responseMessages=responses.standard_get()
+    )
+    def get(self, type_id):
+        """
+        Get the columns in a semantic type
+        Returns all of the columns in a semantic type that match the given parameters.
+
+        Returned body will have the following format, but if returnColumnData is not given as true, "data" will be omitted:
+        <pre>
+        [
+            {
+                "id": "",
+                "name": "",
+                "source": "",
+                "model": "",
+                "data": [
+                    "",
+                    "",
+                    ""
+                ]
+            }
+        ]
+        </pre>
+        Note that giving no parameters will return all columns with no data.
+        """
         return
 
 
-    def post(self):
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_names(True, "Name of the column to be created", False),
+            parameters.source_names(True, "Name of the source of the column to be created", False),
+            parameters.models(True, "Model of the column to be created, if none is given 'default' will be used", False),
+            {
+                "name": "force",
+                "description": "Force add the column, replacing it if already exists",
+                "required": False,
+                "allowMultiple": False,
+                "dataType": 'boolean',
+                "paramType": "query"
+            },
+            parameters.body(False)
+        ],
+        responseMessages=responses.standard_post()
+    )
+    def post(self, type_id):
+        """
+        Add a column to a semantic type
+        Creates the column and returns the id
+        """
         return
 
 
-    def delete(self):
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(desc="The ids of the column(s) to be deleted"),
+            parameters.source_names(),
+            parameters.column_names(desc="The names of the column(s) to be deleted"),
+            parameters.models()
+        ],
+        responseMessages=responses.standard_delete(),
+    )
+    def delete(self, type_id):
+        """
+        Delete a column from a semantic type
+        Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
+        """
         return
 
 
