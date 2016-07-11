@@ -91,14 +91,14 @@ class parameters(object):
 
 
     @staticmethod
-    def column_ids(required=False, desc="List of column ids which the semantic type(s) should have"):
+    def column_ids(required=False, desc="List of column ids which the semantic type(s) should have", multiple=True, param_type="query"):
         return {
-            "name": "columnIds",
+            "name": "columnIds" if multiple else "columnId",
             "description": desc,
             "required": required,
-            "allowMultiple": True,
+            "allowMultiple": multiple,
             "dataType": "string",
-            "paramType": "query"
+            "paramType": param_type
         }
 
 
@@ -133,7 +133,7 @@ class parameters(object):
             "description": "List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones",
             "required": required,
             "allowMultiple": False,
-            "dataType": 'string',
+            "dataType": "string",
             "paramType": "body"
         }
 
@@ -350,19 +350,80 @@ class SemanticTypeColumns(Resource):
 
 
 class SemanticTypeColumnData(Resource):
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(True, "The ids of the column to get the info on", False, "path")
+        ],
+        responseMessages=responses.standard_get()
+    )
     def get(self):
+        """
+        Get the information on a column in a semantic type
+        Returns all of the information on a column in a semantic type.
+
+        Returned body will have the following format:
+        <pre>
+        {
+            "id": "",
+            "name": "",
+            "source": "",
+            "model": "",
+            "data": [
+                "",
+                "",
+                ""
+            ]
+        }
+        </pre>
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
+            parameters.body(True)
+        ],
+        responseMessages=responses.standard_post()
+    )
     def post(self):
+        """
+        Adds data to the given column
+        Appends data to the given column.  Use put to replace the data instead
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
+            parameters.body(True)
+        ],
+        responseMessages=responses.standard_post()
+    )
     def put(self):
+        """
+        Replaces the data in the column
+        Replaces the data in the column with the provided data
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[
+            parameters.type_id(True, False, "path"),
+            parameters.column_ids(True, "The ids of the column to remove the data from", False, "path")
+        ],
+        responseMessages=responses.standard_delete(),
+    )
     def delete(self):
+        """
+        Delete all of the data in a column
+        Removes all of the data in the column
+        """
         return
 
 
