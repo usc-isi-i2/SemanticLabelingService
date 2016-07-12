@@ -531,7 +531,7 @@ class Models(Resource):
     def post(self):
         """
         Add a model.json
-        Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.
+        Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
         """
         return
 
@@ -547,17 +547,33 @@ class Models(Resource):
     def delete(self):
         """
         Remove a model.json
-        Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed.
+        Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
         """
         return
 
 
 class ModelData(Resource):
+    @swagger.operation(
+        parameters=[parameters.model_id(True, False, "path")],
+        responseMessages=responses.standard_get()
+    )
     def get(self):
+        """
+        Gets the current state of a model.json
+        Returns the current state of the given model.json id
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[parameters.body(True, "The jsonlines which contain the data to add")],
+        responseMessages=responses.standard_get()
+    )
     def post(self):
+        """
+        Add data to the semantic types
+        Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns.
+        """
         return
 
 
