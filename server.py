@@ -21,7 +21,7 @@ class parameters(object):
     @staticmethod
     def type_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": "type_ids" if multiple else "type_id",
+            "name": "type_id" if param_type == "path" else "typeIds" if multiple else "typeId",
             "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
             "required": required,
             "allowMultiple": multiple,
@@ -93,7 +93,7 @@ class parameters(object):
     @staticmethod
     def column_ids(required=False, desc="List of column ids which the semantic type(s) should have", multiple=True, param_type="query"):
         return {
-            "name": "columnIds" if multiple else "columnId",
+            "name": "column_id" if param_type == "path" else "columnIds" if multiple else "columnId",
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -127,10 +127,10 @@ class parameters(object):
 
 
     @staticmethod
-    def body(required=False):
+    def body(required=False, desc="List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones"):
         return {
             "name": "body",
-            "description": "List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones",
+            "description": desc,
             "required": required,
             "allowMultiple": False,
             "dataType": "string",
@@ -428,7 +428,29 @@ class SemanticTypeColumnData(Resource):
 
 
 class Predict(Resource):
+    @swagger.operation(
+        parameters=[
+            parameters.namespaces(),
+            parameters.column_names(False, "Name of the column the data may belong to", False),
+            parameters.models(False, "The model the data may belong to", False),
+            parameters.source_names(False, "Source the data may belong to", False),
+            parameters.body(True, "List of data values to predict")
+        ],
+        responseMessages=responses.standard_get()
+    )
     def get(self):
+        """
+        Predict the semantic type of data
+        Predicts the semantic type of the given data.  Returns a list of types in the following format (sorted from most to least likely):
+        <pre>
+        [
+            {
+                "id": "",
+                "score":
+            }
+        ]
+        </pre>
+        """
         return
 
 
