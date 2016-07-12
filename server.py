@@ -138,6 +138,42 @@ class parameters(object):
         }
 
 
+    @staticmethod
+    def model_names(required=False):
+        return {
+            "name": "modelNames",
+            "description": "Name of the models",
+            "required": required,
+            "allowMultiple": True,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def model_desc(required=False):
+        return {
+            "name": "modelDesc",
+            "description": "Part or all of a model description",
+            "required": required,
+            "allowMultiple": False,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
+    def model_id(required=False, multiple=True, param_type="query"):
+        return {
+            "name": "model_id" if param_type == "path" else "modelIds" if multiple else "modelId",
+            "description": "Id(s) of the model.json",
+            "required": required,
+            "allowMultiple": multiple,
+            "dataType": "string",
+            "paramType": "path"
+        }
+
+
 class responses(object):
     @staticmethod
     def standard_get():
@@ -455,19 +491,72 @@ class Predict(Resource):
 
 
 class Models(Resource):
+    @swagger.operation(
+        parameters=[
+            parameters.model_names(),
+            parameters.model_desc(),
+            {
+                "name": "showAllData",
+                "description": "Show all of the model data",
+                "required": False,
+                "allowMultiple": False,
+                "dataType": 'boolean',
+                "paramType": "query"
+            }
+        ],
+        responseMessages=responses.standard_get()
+    )
     def get(self):
+        """
+        Get model.json models
+        Returns all of the models.  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  Return body will have the following format:
+        <pre>
+        [
+            {
+                "id": "",
+                "name": "",
+                "description": "",
+                "model": { ... }
+            }
+        ]
+        </pre>
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[parameters.body(True, "The model.json file")],
+        responseMessages=responses.standard_post()
+    )
     def post(self):
+        """
+        Add a model.json
+        Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.
+        """
         return
 
 
+    @swagger.operation(
+        parameters=[
+            parameters.model_id(),
+            parameters.model_names(),
+            parameters.model_desc(),
+        ],
+        responseMessages=responses.standard_get()
+    )
     def delete(self):
+        """
+        Remove a model.json
+        Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed.
+        """
         return
 
 
 class ModelData(Resource):
+    def get(self):
+        return
+
+
     def post(self):
         return
 
