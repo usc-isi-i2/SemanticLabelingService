@@ -13,7 +13,7 @@ def encode_semantic_type(domain, _property):
 
 
 def get_semantic_type_id(namespace, encoded_semantic_type):
-    return encode(namespace+"\n"+encoded_semantic_type)
+    return encode(namespace + "\n" + encoded_semantic_type)
 
 
 def semantic_type_id_decode(_id):
@@ -64,6 +64,3 @@ def column_path_to_properties(path):
     semantic_type = decode_semantic_type(path[-3])
     namespace = path[-4]
     return namespace, semantic_type, source_name, column_name
-
-
-

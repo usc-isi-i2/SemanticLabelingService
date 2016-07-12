@@ -1,20 +1,29 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_restful import Api, Resource
 from flask_restful_swagger import swagger
-from pymongo import MongoClient
 
 import config
+import service.serverLogic
 
 
-# from semantic_labeling.run_experiments import SemanticLabeler
-
-
-# semantic_labeler = SemanticLabeler()
-db = MongoClient().data
 app = Flask(__name__, static_folder='../static')
 api = swagger.docs(Api(app), apiVersion='0.2', basePath='/', resourcePath='/', produces=["application/json", "text/html"], api_spec_url='/api/spec', description='Semantic Typing')
 CORS(app)
+
+service = service.serverLogic.Server()
+
+
+################################################################################################################################
+#                                                                                                                              #
+#  This class is only used for what gets called by the API and swagger docs.  There isn't any logic code here since it would   #
+#  be messy and harder to maintain.  It's all in service/serverLogic.py                                                        #
+#                                                                                                                              #
+#  Each of the API functions in this class should call a helper function in the Server class of serverLogic.py whose name      #
+#  follows the form of {class_name}_{type}, where {class_name} is the name of the class in this file, but with underscores     #
+#  instead of camelCase and {type} is the HTTP method name, such as GET or POST.  Example: semantic_types_get()                #
+#                                                                                                                              #
+################################################################################################################################
 
 
 class parameters(object):
@@ -257,7 +266,7 @@ class SemanticTypes(Resource):
         </pre>
         Note that giving no parameters will return all semantic types with no columns.
         """
-        return
+        return service.semantic_types_get(request.args)
 
 
     @swagger.operation(
@@ -272,7 +281,7 @@ class SemanticTypes(Resource):
         Create a semantic type
         Creates a semantic type and returns the its id.
         """
-        return
+        return service.semantic_types_post(request.args)
 
 
     @swagger.operation(
@@ -300,7 +309,7 @@ class SemanticTypes(Resource):
         Delete a semantic type
         Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
         """
-        return
+        return service.semantic_types_delete(request.args)
 
 
 class SemanticTypeColumns(Resource):
@@ -338,7 +347,7 @@ class SemanticTypeColumns(Resource):
         </pre>
         Note that giving no parameters will return all columns with no data.
         """
-        return
+        return service.semantic_types_columns_get(type_id, request.args)
 
 
     @swagger.operation(
@@ -364,7 +373,7 @@ class SemanticTypeColumns(Resource):
         Add a column to a semantic type
         Creates the column and returns the id
         """
-        return
+        return service.semantic_types_columns_post(type_id, request.args)
 
 
     @swagger.operation(
@@ -382,7 +391,7 @@ class SemanticTypeColumns(Resource):
         Delete a column from a semantic type
         Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
         """
-        return
+        return service.semantic_types_columns_delete(type_id, request.args)
 
 
 class SemanticTypeColumnData(Resource):
@@ -393,7 +402,7 @@ class SemanticTypeColumnData(Resource):
         ],
         responseMessages=responses.standard_get()
     )
-    def get(self):
+    def get(self, type_id, column_id):
         """
         Get the information on a column in a semantic type
         Returns all of the information on a column in a semantic type.
@@ -413,7 +422,7 @@ class SemanticTypeColumnData(Resource):
         }
         </pre>
         """
-        return
+        return service.semantic_types_column_data_get(type_id, column_id, request.args)
 
 
     @swagger.operation(
@@ -424,12 +433,12 @@ class SemanticTypeColumnData(Resource):
         ],
         responseMessages=responses.standard_post()
     )
-    def post(self):
+    def post(self, type_id, column_id):
         """
         Adds data to the given column
         Appends data to the given column.  Use put to replace the data instead
         """
-        return
+        return service.semantic_types_column_data_post(type_id, column_id, request.args)
 
 
     @swagger.operation(
@@ -440,12 +449,12 @@ class SemanticTypeColumnData(Resource):
         ],
         responseMessages=responses.standard_post()
     )
-    def put(self):
+    def put(self, type_id, column_id):
         """
         Replaces the data in the column
         Replaces the data in the column with the provided data
         """
-        return
+        return service.semantic_types_column_data_put(type_id, column_id, request.args)
 
 
     @swagger.operation(
@@ -455,12 +464,12 @@ class SemanticTypeColumnData(Resource):
         ],
         responseMessages=responses.standard_delete(),
     )
-    def delete(self):
+    def delete(self, type_id, column_id):
         """
         Delete all of the data in a column
         Removes all of the data in the column
         """
-        return
+        return service.semantic_types_column_data_delete(type_id, column_id, request.args)
 
 
 class Predict(Resource):
@@ -487,7 +496,7 @@ class Predict(Resource):
         ]
         </pre>
         """
-        return
+        return service.predict_get(request.args)
 
 
 class Models(Resource):
@@ -521,7 +530,7 @@ class Models(Resource):
         ]
         </pre>
         """
-        return
+        return service.models_get(request.args)
 
 
     @swagger.operation(
@@ -533,7 +542,7 @@ class Models(Resource):
         Add a model.json
         Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
         """
-        return
+        return service.models_post(request.args)
 
 
     @swagger.operation(
@@ -549,7 +558,7 @@ class Models(Resource):
         Remove a model.json
         Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
         """
-        return
+        return service.models_delete(request.args)
 
 
 class ModelData(Resource):
@@ -557,24 +566,24 @@ class ModelData(Resource):
         parameters=[parameters.model_id(True, False, "path")],
         responseMessages=responses.standard_get()
     )
-    def get(self):
+    def get(self, model_id):
         """
         Gets the current state of a model.json
         Returns the current state of the given model.json id
         """
-        return
+        return service.model_data_get(model_id, request.args)
 
 
     @swagger.operation(
         parameters=[parameters.body(True, "The jsonlines which contain the data to add")],
         responseMessages=responses.standard_get()
     )
-    def post(self):
+    def post(self, model_id):
         """
         Add data to the semantic types
         Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns.
         """
-        return
+        return service.model_data_post(model_id, request.args)
 
 
 api.add_resource(SemanticTypes, '/semantic_types')
