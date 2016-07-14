@@ -11,7 +11,7 @@ app = Flask(__name__, static_folder='../static')
 api = swagger.docs(Api(app), apiVersion='0.2', basePath='/', resourcePath='/', produces=["application/json", "text/html"], api_spec_url='/api/spec', description='Semantic Typing')
 CORS(app)
 
-service = service.serverLogic.Server()
+service = service.serverLogic.Server()  # FIXME: possibly all should not run if this isn't main?
 
 
 ################################################################################################################################
@@ -211,6 +211,33 @@ class responses(object):
             {"code": 404, "message": "Not Found"},
             {"code": 500, "message": "Internal Server Error"}
         ]
+
+
+class Predict(Resource):
+    @swagger.operation(
+        parameters=[
+            parameters.namespaces(),
+            parameters.column_names(False, "Name of the column the data may belong to", False),
+            parameters.models(False, "The model the data may belong to", False),
+            parameters.source_names(False, "Source the data may belong to", False),
+            parameters.body(True, "List of data values to predict")
+        ],
+        responseMessages=responses.standard_get()
+    )
+    def post(self):
+        """
+        Predict the semantic type of data
+        Predicts the semantic type of the given data.  Returns a list of types in the following format (sorted from most to least likely):
+        <pre>
+        [
+            {
+                "id": "",
+                "score":
+            }
+        ]
+        </pre>
+        """
+        return service.predict_get(request.args, request.data)
 
 
 class SemanticTypes(Resource):
@@ -472,33 +499,6 @@ class SemanticTypeColumnData(Resource):
         return service.semantic_types_column_data_delete(type_id, column_id, request.args)
 
 
-class Predict(Resource):
-    @swagger.operation(
-        parameters=[
-            parameters.namespaces(),
-            parameters.column_names(False, "Name of the column the data may belong to", False),
-            parameters.models(False, "The model the data may belong to", False),
-            parameters.source_names(False, "Source the data may belong to", False),
-            parameters.body(True, "List of data values to predict")
-        ],
-        responseMessages=responses.standard_get()
-    )
-    def get(self):
-        """
-        Predict the semantic type of data
-        Predicts the semantic type of the given data.  Returns a list of types in the following format (sorted from most to least likely):
-        <pre>
-        [
-            {
-                "id": "",
-                "score":
-            }
-        ]
-        </pre>
-        """
-        return service.predict_get(request.args)
-
-
 class Models(Resource):
     @swagger.operation(
         parameters=[
@@ -586,10 +586,10 @@ class ModelData(Resource):
         return service.model_data_post(model_id, request.args)
 
 
+api.add_resource(Predict, '/predict')
 api.add_resource(SemanticTypes, '/semantic_types')
 api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
 api.add_resource(SemanticTypeColumnData, '/semantic_types/<string:type_id>/<string:column_id>')
-api.add_resource(Predict, '/predict')
 api.add_resource(Models, '/models')
 api.add_resource(ModelData, '/models/<string:model_id>')
 
