@@ -17,12 +17,17 @@ not_allowed_chars = '[\\/*?"<>|\s\t]'
 
 NAMESPACES = "namespaces"
 COLUMN_NAME = "columnName"
+COLUMN_NAMES = "columnNames"
 SOURCE_COLUMN = "sourceColumn"
+SOURCE_COLUMNS = "sourceColumns"
+COLUMN_IDS = "columnIds"
 MODEL = "model"
-
-INVALID_PARAMETERS = "Invalid query parameters"
-INVALID_BODY = "Invalid body"
-
+MODELS = "models"
+CLASS = "class"
+PROPERTY = "property"
+RETURN_COLUMNS = "returnColumns"
+RETURN_COLUMN_DATA = "returnColumnData"
+DELETE_ALL = "deleteAll"
 
 class Server(object):
     def __init__(self):
@@ -49,9 +54,10 @@ class Server(object):
 
     ################ Predict ################
 
-    def predict_get(self, args, body):
+    def predict_post(self, args, body):
+        #### Assert args and body are valid
         if body is None or body == "":
-            return message(INVALID_BODY, 400)
+            return message("Invalid message body", 400)
 
         args = args.copy()
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
@@ -59,23 +65,65 @@ class Server(object):
         model = args.pop(MODEL, None)
         source_col = args.pop(SOURCE_COLUMN, None)
         if len(args) > 0:
-            return message(INVALID_PARAMETERS, 400)
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
 
+        #### Predict the types
         return message("Method partially implemented", 601)
 
 
     ################ SemanticTypes ################
 
     def semantic_types_get(self, args):
-        return
+        #### Assert args are valid
+        args = args.copy()
+        class_ = args.pop(CLASS, None)
+        property_ = args.pop(PROPERTY, None)
+        namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
+        source_columns = args.pop(SOURCE_COLUMNS).split(",") if args.get(SOURCE_COLUMNS) else None
+        column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+        column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+        models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+        return_columns = args.pop(RETURN_COLUMNS, None)
+        return_column_data = args.pop(RETURN_COLUMN_DATA, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
+        return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
+
+        #### Get the types
+        return message("Method partially implemented", 601)
 
 
     def semantic_types_post(self, args):
-        return
+        #### Assert args are valid
+        args = args.copy()
+        class_ = args.pop(CLASS, None)
+        property_ = args.pop(PROPERTY, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        if class_ is None or property_ is None:
+            return message("Both 'class' and 'property' must be specified", 400)
+
+        #### Add the type
+        return message("Method partially implemented", 601)
 
 
     def semantic_types_delete(self, args):
-        return
+        #### Assert args are valid
+        args = args.copy()
+        class_ = args.pop(CLASS, None)
+        property_ = args.pop(PROPERTY, None)
+        namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
+        source_columns = args.pop(SOURCE_COLUMNS).split(",") if args.get(SOURCE_COLUMNS) else None
+        column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+        column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+        models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+        delete_all = args.pop(DELETE_ALL, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+
+        #### Delete the types
+        return message("Method partially implemented", 601)
 
 
     ################ SemanticTypesColumns ################

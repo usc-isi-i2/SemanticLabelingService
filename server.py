@@ -237,7 +237,7 @@ class Predict(Resource):
         ]
         </pre>
         """
-        return service.predict_get(request.args, request.data)
+        return service.predict_post(request.args, request.data)
 
 
 class SemanticTypes(Resource):
@@ -317,6 +317,7 @@ class SemanticTypes(Resource):
             parameters.class_(),
             parameters.property(),
             parameters.namespaces(),
+            parameters.source_names(),
             parameters.column_names(),
             parameters.column_ids(),
             parameters.models(),
