@@ -23,11 +23,17 @@ SOURCE_COLUMNS = "sourceColumns"
 COLUMN_IDS = "columnIds"
 MODEL = "model"
 MODELS = "models"
+MODEL_NAMES = "modelNames"
+MODEL_DESC = "modelDesc"
+MODEL_IDS = "modelIds"
 CLASS = "class"
 PROPERTY = "property"
 RETURN_COLUMNS = "returnColumns"
 RETURN_COLUMN_DATA = "returnColumnData"
 DELETE_ALL = "deleteAll"
+FORCE = "force"
+SHOW_ALL = "showAllData"
+
 
 class Server(object):
     def __init__(self):
@@ -58,7 +64,6 @@ class Server(object):
         #### Assert args and body are valid
         if body is None or body == "":
             return message("Invalid message body", 400)
-
         args = args.copy()
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
         col_name = args.pop(COLUMN_NAME, None)
@@ -129,47 +134,158 @@ class Server(object):
     ################ SemanticTypesColumns ################
 
     def semantic_types_columns_get(self, type_id, args):
-        return
+        #### Assert args are valid
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        args = args.copy()
+        column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+        source_columns = args.pop(SOURCE_COLUMNS).split(",") if args.get(SOURCE_COLUMNS) else None
+        column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+        models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+        return_column_data = args.pop(RETURN_COLUMN_DATA, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
+
+        #### Get the columns
+        return message("Method partially implemented", 601)
 
 
-    def semantic_types_columns_post(self, type_id, args):
-        return
+    def semantic_types_columns_post(self, type_id, args, body):
+        #### Assert args are valid
+        if body is None or body == "":
+            return message("Invalid message body", 400)
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        args = args.copy()
+        column_name = args.pop(COLUMN_NAME, None)
+        source_column = args.pop(SOURCE_COLUMN, None)
+        model = args.pop(MODEL, None)
+        force = args.pop(FORCE, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        if column_name is None or source_column is None:
+            return message("Either 'columnName' or 'sourceColumn' was omitted and they are both required")
+        if model is None:
+            model = "default"
+        force = True if force is not None and force.lower() == "true" else False
+
+        #### Add the column
+        return message("Method partially implemented", 601)
 
 
     def semantic_types_columns_delete(self, type_id, args):
-        return
+        #### Assert args are valid
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        args = args.copy()
+        column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+        source_columns = args.pop(SOURCE_COLUMNS).split(",") if args.get(SOURCE_COLUMNS) else None
+        column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+        models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+
+        #### Delete the columns
+        return message("Method partially implemented", 601)
 
 
     ################ SemanticTypesColumnData ################
 
     def semantic_types_column_data_get(self, type_id, column_id, args):
-        return
+        #### Assert args are valid
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        if column_id is None or len(column_id) < 1:
+            return message("Invalid column_id", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Get the column
+        return message("Method partially implemented", 601)
 
 
-    def semantic_types_column_data_post(self, type_id, column_id, args):
-        return
+    def semantic_types_column_data_post(self, type_id, column_id, args, body):
+        #### Assert args are valid
+        if body is None or body == "":
+            return message("Invalid message body", 400)
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        if column_id is None or len(column_id) < 1:
+            return message("Invalid column_id", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Add the data
+        return message("Method partially implemented", 601)
 
 
-    def semantic_types_column_data_put(self, type_id, column_id, args):
-        return
+    def semantic_types_column_data_put(self, type_id, column_id, args, body):
+        #### Assert args are valid
+        if body is None or body == "":
+            return message("Invalid message body", 400)
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        if column_id is None or len(column_id) < 1:
+            return message("Invalid column_id", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Replace the data
+        return message("Method partially implemented", 601)
 
 
     def semantic_types_column_data_delete(self, type_id, column_id, args):
-        return
+        #### Assert args are valid
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        if column_id is None or len(column_id) < 1:
+            return message("Invalid column_id", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Delete the data
+        return message("Method partially implemented", 601)
 
 
     ################ Models ################
 
     def models_get(self, args):
-        return
+        #### Assert args are valid
+        args = args.copy()
+        model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
+        model_desc = args.pop(MODEL_DESC, None)
+        show_all = args.pop(SHOW_ALL, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        show_all = True if show_all is not None and show_all.lower() == "true" else False
+
+        #### Find the model
+        return message("Method partially implemented", 601)
 
 
-    def models_post(self, args):
-        return
+    def models_post(self, args, body):
+        #### Assert args are valid
+        if body is None or len(body) < 1:
+            return message("Invalid message body", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Add the model
+        return message("Method partially implemented", 601)
 
 
     def models_delete(self, args):
-        return
+        #### Assert args are valid
+        args = args.copy()
+        model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
+        model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
+        model_desc = args.pop(MODEL_DESC, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+
+        #### Find the model
+        return message("Method partially implemented", 601)
 
 
     ################ ModelData ################

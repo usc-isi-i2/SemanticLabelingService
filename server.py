@@ -383,7 +383,7 @@ class SemanticTypeColumns(Resource):
             parameters.type_id(True, False, "path"),
             parameters.column_names(True, "Name of the column to be created", False),
             parameters.source_names(True, "Name of the source of the column to be created", False),
-            parameters.models(True, "Model of the column to be created, if none is given 'default' will be used", False),
+            parameters.models(False, "Model of the column to be created, if none is given 'default' will be used", False),
             {
                 "name": "force",
                 "description": "Force add the column, replacing it if already exists",
@@ -401,7 +401,7 @@ class SemanticTypeColumns(Resource):
         Add a column to a semantic type
         Creates the column and returns the id
         """
-        return service.semantic_types_columns_post(type_id, request.args)
+        return service.semantic_types_columns_post(type_id, request.args, request.data)
 
 
     @swagger.operation(
@@ -466,7 +466,7 @@ class SemanticTypeColumnData(Resource):
         Adds data to the given column
         Appends data to the given column.  Use put to replace the data instead
         """
-        return service.semantic_types_column_data_post(type_id, column_id, request.args)
+        return service.semantic_types_column_data_post(type_id, column_id, request.args, request.data)
 
 
     @swagger.operation(
