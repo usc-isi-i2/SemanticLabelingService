@@ -58,6 +58,18 @@ class Server(object):
         print " -- Need to figure out init -- "
 
 
+    def _create_semantic_type(self, class_, property_):
+        return "type_id"
+
+
+    def _create_column(self, type_id, column_name, source_column, model, force=False):
+        return "column_id"
+
+
+    def _add_data_to_column(self, type_id, column_id, data):
+        return
+
+
     ################ Predict ################
 
     def predict_post(self, args, body):
@@ -110,7 +122,9 @@ class Server(object):
             return message("Both 'class' and 'property' must be specified", 400)
 
         #### Add the type
+        # There is a helper method because 'models_post' also creates semantic types
         return message("Method partially implemented", 601)
+        # return message(self._create_semantic_type(class_, property_), 201)
 
 
     def semantic_types_delete(self, args):
@@ -153,25 +167,52 @@ class Server(object):
 
     def semantic_types_columns_post(self, type_id, args, body):
         #### Assert args are valid
-        if body is None or body == "":
-            return message("Invalid message body", 400)
         if type_id is None or len(type_id) < 1:
             return message("Invalid type_id", 400)
         args = args.copy()
         column_name = args.pop(COLUMN_NAME, None)
         source_column = args.pop(SOURCE_COLUMN, None)
         model = args.pop(MODEL, None)
-        force = args.pop(FORCE, None)
         if len(args) > 0:
             return message("The following query parameters are invalid:  " + str(args.keys()), 400)
         if column_name is None or source_column is None:
             return message("Either 'columnName' or 'sourceColumn' was omitted and they are both required")
         if model is None:
             model = "default"
-        force = True if force is not None and force.lower() == "true" else False
 
         #### Add the column
+        column_id = self._create_column(type_id, column_name, source_column, model, False)
+        if column_id is None:
+            return message("Column already exists", 409)
+        if body is not None and body.strip() != "":
+            self._add_data_to_column(type_id, column_id, body.split("\n"))
+
         return message("Method partially implemented", 601)
+        # return message(column_id, 201)
+
+
+    def semantic_types_columns_put(self, type_id, args, body):
+        #### Assert args are valid
+        if type_id is None or len(type_id) < 1:
+            return message("Invalid type_id", 400)
+        args = args.copy()
+        column_name = args.pop(COLUMN_NAME, None)
+        source_column = args.pop(SOURCE_COLUMN, None)
+        model = args.pop(MODEL, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        if column_name is None or source_column is None:
+            return message("Either 'columnName' or 'sourceColumn' was omitted and they are both required")
+        if model is None:
+            model = "default"
+
+        #### Add the column
+        column_id = self._create_column(type_id, column_name, source_column, model, True)
+        if body is not None and body.strip() != "":
+            self._add_data_to_column(type_id, column_id, body.split("\n"))
+
+        return message("Method partially implemented", 601)
+        # return message(column_id, 201)
 
 
     def semantic_types_columns_delete(self, type_id, args):
@@ -291,8 +332,22 @@ class Server(object):
     ################ ModelData ################
 
     def model_data_get(self, model_id, args):
-        return
+        if model_id is None or len(model_id) < 1:
+            return message("Invalid model_id", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Get the model
+        return message("Method partially implemented", 601)
 
 
-    def model_data_post(self, model_id, args):
-        return
+    def model_data_post(self, model_id, args, body):
+        if model_id is None or len(model_id) < 1:
+            return message("Invalid model_id", 400)
+        if body is None or len(body) < 1:
+            return message("Invalid message body", 400)
+        if len(args) > 0:
+            return message("Invalid arguments, there should be none", 400)
+
+        #### Process the data
+        return message("Method partially implemented", 601)
