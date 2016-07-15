@@ -196,7 +196,7 @@ class responses(object):
 
 
     @staticmethod
-    def standard_post():
+    def standard_put():
         return [
             {"code": 201, "message": "Created"},
             {"code": 400, "message": "Bad Request"},
@@ -205,7 +205,7 @@ class responses(object):
 
 
     @staticmethod
-    def standard_post_with409():
+    def standard_post():
         return [
             {"code": 201, "message": "Created"},
             {"code": 400, "message": "Bad Request"},
@@ -319,9 +319,25 @@ class SemanticTypes(Resource):
     def post(self):
         """
         Create a semantic type
-        Creates a semantic type and returns the its id.
+        Creates a semantic type and returns its id.
         """
         try: return service.semantic_types_post(request.args)
+        except Exception as e: return message(str(e), 500)
+
+
+    @swagger.operation(
+        parameters=[
+            parameters.class_(True),
+            parameters.property(True)
+        ],
+        responseMessages=responses.standard_put()
+    )
+    def put(self):
+        """
+        Create/Replace a semantic type
+        Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that replacing a semantic type will remove all of it's columns.
+        """
+        try: return service.semantic_types_put(request.args)
         except Exception as e: return message(str(e), 500)
 
 
@@ -421,7 +437,7 @@ class SemanticTypeColumns(Resource):
             parameters.models(False, "Model of the column to be created, if none is given 'default' will be used", False),
             parameters.body(False)
         ],
-        responseMessages=responses.standard_post_with409()
+        responseMessages=responses.standard_put()
     )
     def put(self, type_id):
         """
@@ -506,7 +522,7 @@ class SemanticTypeColumnData(Resource):
             parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
             parameters.body(True)
         ],
-        responseMessages=responses.standard_post()
+        responseMessages=responses.standard_put()
     )
     def put(self, type_id, column_id):
         """
@@ -570,7 +586,7 @@ class Models(Resource):
 
     @swagger.operation(
         parameters=[parameters.body(True, "The model.json file")],
-        responseMessages=responses.standard_post()
+        responseMessages=responses.standard_put()
     )
     def post(self):
         """
@@ -617,7 +633,7 @@ class ModelData(Resource):
             parameters.model_id(True, False, "path"),
             parameters.body(True, "The jsonlines which contain the data to add")
         ],
-        responseMessages=responses.standard_get()
+        responseMessages=responses.standard_put()
     )
     def post(self, model_id):
         """

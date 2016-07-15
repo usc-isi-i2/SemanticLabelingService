@@ -58,7 +58,7 @@ class Server(object):
         print " -- Need to figure out init -- "
 
 
-    def _create_semantic_type(self, class_, property_):
+    def _create_semantic_type(self, class_, property_, force=False):
         return "type_id"
 
 
@@ -122,9 +122,22 @@ class Server(object):
             return message("Both 'class' and 'property' must be specified", 400)
 
         #### Add the type
-        # There is a helper method because 'models_post' also creates semantic types
-        return message("Method partially implemented", 601)
-        # return message(self._create_semantic_type(class_, property_), 201)
+        type_id = self._create_semantic_type(class_, property_)
+        return message("Semantic type already exists", 409) if type_id is None else message(type_id, 201)
+
+
+    def semantic_types_put(self, args):
+        #### Assert args are valid
+        args = args.copy()
+        class_ = args.pop(CLASS, None)
+        property_ = args.pop(PROPERTY, None)
+        if len(args) > 0:
+            return message("The following query parameters are invalid:  " + str(args.keys()), 400)
+        if class_ is None or property_ is None:
+            return message("Both 'class' and 'property' must be specified", 400)
+
+        #### Add the type
+        return message(self._create_semantic_type(class_, property_, True), 201)
 
 
     def semantic_types_delete(self, args):
@@ -186,9 +199,7 @@ class Server(object):
             return message("Column already exists", 409)
         if body is not None and body.strip() != "":
             self._add_data_to_column(type_id, column_id, body.split("\n"))
-
-        return message("Method partially implemented", 601)
-        # return message(column_id, 201)
+        return message(column_id, 201)
 
 
     def semantic_types_columns_put(self, type_id, args, body):
@@ -313,6 +324,7 @@ class Server(object):
             return message("Invalid arguments, there should be none", 400)
 
         #### Add the model
+
         return message("Method partially implemented", 601)
 
 
