@@ -1,11 +1,12 @@
 # import os
 # import re
-# from pymongo import MongoClient
+import validators
+import base64
+from pymongo import MongoClient
 # from collections import OrderedDict
 #
 # import config
 # import service
-# import lib
 # from search_engine.indexer import Indexer
 # from data_source.data_source import DataSource
 # from semantic_labeling.run_experiments import SemanticLabeler
@@ -14,6 +15,10 @@ from service.errors import *
 
 
 not_allowed_chars = '[\\/*?"<>|\s\t]'
+
+NAMESPACE = "namespace"
+ID = "_id"
+TIMESTAMP = "timestamp"
 
 NAMESPACES = "namespaces"
 COLUMN_NAME = "columnName"
@@ -38,7 +43,7 @@ SHOW_ALL = "showAllData"
 class Server(object):
     def __init__(self):
         # self.source_map = OrderedDict()
-        # self.db = MongoClient().data
+        self.db = MongoClient().data
         # self.indexer = Indexer()
         # # self.data_set_map[namespace] = source_map
         #
@@ -57,9 +62,27 @@ class Server(object):
         #     self.source_map[source].save(namespace_safe)
         print " -- Need to figure out init -- "
 
+    @staticmethod
+    def _get_type_id(class_, property_):
+        return base64.b64encode(class_) + "-" + base64.b64encode(property_)
 
     def _create_semantic_type(self, class_, property_, force=False):
-        return "type_id"
+        # Verify that class is a valid uri and namespace is a valid uri
+        namespace = "/".join(class_.split("/")[:-1])
+        if not validators.url(class_) or not validators.url(namespace):
+            return message("Invalid class URI was given", 400)
+
+        # Actually add the type
+        type_id = self._get_type_id(class_, property_)
+        db_body = {CLASS: class_, PROPERTY: property_, NAMESPACE: namespace, ID: type_id}
+        if force:
+            # TODO: Also delete all other data associated with this one
+            self.db.posts.delete_many(db_body)
+        else:
+            if self.db.posts.find_one(db_body):
+                return message("Semantic type already exists", 409)
+        self.db.posts.insert_one(db_body)
+        return message(type_id, 201)
 
 
     def _create_column(self, type_id, column_name, source_column, model, force=False):
@@ -108,7 +131,8 @@ class Server(object):
         return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
 
         #### Get the types
-        return message("Method partially implemented", 601)
+
+        return message(str(list(self.db.posts.find({CLASS: class_, PROPERTY: property_}))), 601)
 
 
     def semantic_types_post(self, args):
@@ -122,8 +146,7 @@ class Server(object):
             return message("Both 'class' and 'property' must be specified", 400)
 
         #### Add the type
-        type_id = self._create_semantic_type(class_, property_)
-        return message("Semantic type already exists", 409) if type_id is None else message(type_id, 201)
+        return self._create_semantic_type(class_, property_)
 
 
     def semantic_types_put(self, args):
@@ -137,7 +160,7 @@ class Server(object):
             return message("Both 'class' and 'property' must be specified", 400)
 
         #### Add the type
-        return message(self._create_semantic_type(class_, property_, True), 201)
+        return self._create_semantic_type(class_, property_, True)
 
 
     def semantic_types_delete(self, args):
@@ -155,6 +178,7 @@ class Server(object):
             return message("The following query parameters are invalid:  " + str(args.keys()), 400)
 
         #### Delete the types
+        self.db.posts.delete_many({CLASS: class_, PROPERTY: property_})
         return message("Method partially implemented", 601)
 
 

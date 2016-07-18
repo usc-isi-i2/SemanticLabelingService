@@ -1,3 +1,5 @@
+import traceback
+
 from flask import Flask, request
 from flask_cors import CORS
 from flask_restful import Api, Resource
@@ -249,7 +251,7 @@ class Predict(Resource):
         </pre>
         """
         try: return service.predict_post(request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 class SemanticTypes(Resource):
@@ -306,7 +308,7 @@ class SemanticTypes(Resource):
         Note that giving no parameters will return all semantic types with no columns.
         """
         try: return service.semantic_types_get(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -322,7 +324,7 @@ class SemanticTypes(Resource):
         Creates a semantic type and returns its id.
         """
         try: return service.semantic_types_post(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -338,7 +340,7 @@ class SemanticTypes(Resource):
         Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that replacing a semantic type will remove all of it's columns.
         """
         try: return service.semantic_types_put(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -368,7 +370,7 @@ class SemanticTypes(Resource):
         Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
         """
         try: return service.semantic_types_delete(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 class SemanticTypeColumns(Resource):
@@ -407,7 +409,7 @@ class SemanticTypeColumns(Resource):
         Note that giving no parameters will return all columns with no data.
         """
         try: return service.semantic_types_columns_get(type_id, request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -426,7 +428,7 @@ class SemanticTypeColumns(Resource):
         Creates the column and returns the id
         """
         try: return service.semantic_types_columns_post(type_id, request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -445,7 +447,7 @@ class SemanticTypeColumns(Resource):
         Creates the column if it does not exist and replaces the column if it does, then returns the id if the column.
         """
         try: return service.semantic_types_columns_put(type_id, request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -464,7 +466,7 @@ class SemanticTypeColumns(Resource):
         Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
         """
         try: return service.semantic_types_columns_delete(type_id, request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 class SemanticTypeColumnData(Resource):
@@ -496,7 +498,7 @@ class SemanticTypeColumnData(Resource):
         </pre>
         """
         try: return service.semantic_types_column_data_get(type_id, column_id, request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -513,7 +515,7 @@ class SemanticTypeColumnData(Resource):
         Appends data to the given column.  Use put to replace the data instead
         """
         try: return service.semantic_types_column_data_post(type_id, column_id, request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -530,7 +532,7 @@ class SemanticTypeColumnData(Resource):
         Replaces the data in the column with the provided data
         """
         try: return service.semantic_types_column_data_put(type_id, column_id, request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -546,7 +548,7 @@ class SemanticTypeColumnData(Resource):
         Removes all of the data in the column
         """
         try: return service.semantic_types_column_data_delete(type_id, column_id, request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 class Models(Resource):
@@ -581,7 +583,7 @@ class Models(Resource):
         </pre>
         """
         try: return service.models_get(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -594,7 +596,7 @@ class Models(Resource):
         Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
         """
         try: return service.models_post(request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -611,7 +613,7 @@ class Models(Resource):
         Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
         """
         try: return service.models_delete(request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 class ModelData(Resource):
@@ -625,7 +627,7 @@ class ModelData(Resource):
         Returns the current state of the given model.json id
         """
         try: return service.model_data_get(model_id, request.args)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
     @swagger.operation(
@@ -641,7 +643,7 @@ class ModelData(Resource):
         Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns.
         """
         try: return service.model_data_post(model_id, request.args, request.data)
-        except Exception as e: return message(str(e), 500)
+        except: return message(str(traceback.format_exc()), 500)
 
 
 api.add_resource(Predict, '/predict')
