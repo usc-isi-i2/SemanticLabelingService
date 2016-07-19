@@ -118,7 +118,7 @@ class Server(object):
         type_id = self._get_type_id(class_, property_)
         db_body = {ID: type_id, DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, CLASS: class_, PROPERTY: property_, NAMESPACE: namespace}
         if force:
-            # TODO: Also delete all other data associated with this one
+            self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id})
             self.db.delete_many(db_body)
         else:
             if self.db.find_one(db_body):
@@ -208,7 +208,7 @@ class Server(object):
                 for i in return_body:
                     if i[TYPE_ID] == t_id:
                         t[COLUMNS] = self._clean_column_output(result, return_column_data)
-        return self._response(return_body, 601)
+        return self._response(return_body, 200)
 
 
     def semantic_types_post(self, args):
