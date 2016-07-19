@@ -81,7 +81,7 @@ class parameters(object):
     @staticmethod
     def source_names(required=False, desc="List of source names that the column(s) should have", multiple=True):
         return {
-            "name": "sourceColumns" if multiple else "sourceColumn",
+            "name": "sourceNames" if multiple else "sourceName",
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -285,13 +285,13 @@ class SemanticTypes(Resource):
         <pre>
         [
             {
-                "id": "",
+                "type_id": "",
                 "class": "",
                 "property": "",
                 "namespace": "",
                 "columns": [
                     {
-                        "id": "",
+                        "column_id": "",
                         "name": "",
                         "source": "",
                         "model": "",
@@ -394,7 +394,7 @@ class SemanticTypeColumns(Resource):
         <pre>
         [
             {
-                "id": "",
+                "column_id": "",
                 "name": "",
                 "source": "",
                 "model": "",
