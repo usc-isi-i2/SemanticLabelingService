@@ -322,7 +322,12 @@ class Server(object):
         return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
 
         #### Get the columns
-        return self._response("Method partially implemented", 601)
+        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
+        if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
+        if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
+        if column_ids is not None: db_body[ID] = {"$in": column_ids}
+        if models is not None: db_body[MODEL] = {"$in": models}
+        return self._response(self._clean_column_output(self.db.find(db_body), return_column_data), 200)
 
 
     def semantic_types_columns_post(self, type_id, args, body):
@@ -360,8 +365,8 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n"), True) if body is not None and body.strip() != "" else self._create_column(type_id, column_name,
-                                                                                                                                                                         source_name, model, force=True)
+        return self._create_column(type_id, column_name, source_name, model, body.split("\n"), True) if body is not None and body.strip() != "" \
+            else self._create_column(type_id, column_name, source_name, model, force=True)
 
 
     def semantic_types_columns_delete(self, type_id, args):
@@ -377,7 +382,14 @@ class Server(object):
             return self._response("The following query parameters are invalid:  " + str(args.keys()), 400)
 
         #### Delete the columns
-        return self._response("Method partially implemented", 601)
+        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
+        if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
+        if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
+        if column_ids is not None: db_body[ID] = {"$in": column_ids}
+        if models is not None: db_body[MODEL] = {"$in": models}
+        self.db.delete_many(db_body)
+
+        return self._response("Columns deleted successfully", 204)
 
 
     ################ SemanticTypesColumnData ################
