@@ -9,6 +9,7 @@ import collections
 from flask import Response
 from pymongo import MongoClient
 
+
 # from collections import OrderedDict
 #
 # import config
@@ -20,6 +21,7 @@ from pymongo import MongoClient
 
 not_allowed_chars = '[\\/*?"<>|\s\t]'
 
+ID_DIVIDER = "-"
 NAMESPACE = "namespace"
 ID = "_id"
 TIMESTAMP = "timestamp"
@@ -85,12 +87,12 @@ class Server(object):
 
     @staticmethod
     def _get_type_id(class_, property_):
-        return base64.b64encode(class_) + "-" + base64.b64encode(property_)
+        return base64.b64encode(class_) + ID_DIVIDER + base64.b64encode(property_)
 
 
     @staticmethod
     def _get_column_id(type_id, column_name, source_name, model):
-        return type_id + "-" + base64.b64encode(column_name) + "-" + base64.b64encode(source_name) + "-" + base64.b64encode(model)
+        return type_id + ID_DIVIDER + base64.b64encode(column_name) + ID_DIVIDER + base64.b64encode(source_name) + ID_DIVIDER + base64.b64encode(model)
 
 
     @staticmethod
@@ -181,33 +183,46 @@ class Server(object):
         return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
 
         #### Get the types
-        # Get all of the semantic types
+        # Find all of the type ids that satisfy the class, property, and namespaces
         db_body = {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE}
         if class_ is not None: db_body[CLASS] = class_
         if property_ is not None: db_body[PROPERTY] = property_
         if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
-        result = list(self.db.find(db_body))
-        return_body = []
-        for t in result:
-            o = collections.OrderedDict()
-            o[TYPE_ID] = t[ID]
-            o[CLASS] = t[CLASS]
-            o[PROPERTY] = t[PROPERTY]
-            o[NAMESPACE] = t[NAMESPACE]
-            return_body.append(o)
-        # Add the columns to the return_body if applicable
-        if return_columns:
+        possible_result = list(self.db.find(db_body))
+        possible_type_ids = set()
+        for t in possible_result:
+            possible_type_ids.add(t[ID])
+
+        # Find all of the type ids from the columns which satisfy the other parameters
+        if source_names or column_names or column_ids or models:
             db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
             if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
-            if column_names is not None: db_body[SOURCE_NAME] = {"$in": column_names}
-            if column_ids is not None: db_body[SOURCE_NAME] = {"$in": column_ids}
-            if models is not None: db_body[SOURCE_NAME] = {"$in": models}
-            for t in return_body:
-                db_body[TYPEID] = t_id = t[TYPE_ID]
-                result = list(self.db.find(db_body))
-                for i in return_body:
-                    if i[TYPE_ID] == t_id:
-                        t[COLUMNS] = self._clean_column_output(result, return_column_data)
+            if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
+            if column_ids is not None: db_body[ID] = {"$in": column_ids}
+            if models is not None: db_body[MODEL] = {"$in": models}
+            other_possible_ids = set()
+            for col in self.db.find(db_body):
+                other_possible_ids.add(col[TYPEID])
+            possible_type_ids = possible_type_ids & other_possible_ids
+
+        # Construct the return body
+        return_body = []
+        for t in possible_result:
+            if t[ID] in possible_type_ids:
+                o = collections.OrderedDict()
+                o[TYPE_ID] = t[ID]
+                o[CLASS] = t[CLASS]
+                o[PROPERTY] = t[PROPERTY]
+                o[NAMESPACE] = t[NAMESPACE]
+                return_body.append(o)
+
+        # Add the column data if requested
+        if return_columns:
+            db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
+            for type_ in return_body:
+                db_body[TYPEID] = type_[TYPE_ID]
+                type_[COLUMNS] = self._clean_column_output(self.db.find(db_body), return_column_data)
+
         return self._response(return_body, 200)
 
 
@@ -254,8 +269,40 @@ class Server(object):
             return self._response("The following query parameters are invalid:  " + str(args.keys()), 400)
 
         #### Delete the types
-        self.db.delete_many({CLASS: class_, PROPERTY: property_})
-        return self._response("Method partially implemented", 601)
+        if delete_all and delete_all.lower() == "true":
+            self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE, DATA_TYPE_COLUMN]}})
+            return self._response("All semantic types and their data was deleted", 204)
+
+        # Find the parent semantic types and everything below them of everything which meets column requirements
+        type_ids_to_delete = []
+        db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
+        if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
+        if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
+        if column_ids is not None: db_body[COLUMN_ID] = {"$in": column_ids}
+        if models is not None: db_body[MODEL] = {"$in": models}
+        for col in self.db.find(db_body):
+            if col[TYPEID] not in type_ids_to_delete:
+                type_ids_to_delete.append(col[TYPEID])
+
+        # Find the semantic types which meet the other requirements and delete all types which need to be
+        possible_types = []
+        db_body = {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE}
+        if class_ is not None: db_body[CLASS] = class_
+        if property_ is not None: db_body[PROPERTY] = property_
+        if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
+        if source_names is None and column_names is None and column_ids is None and models is None:
+            self.db.delete_many(db_body)
+        else:
+            for t in self.db.find(db_body):
+                if t[ID] not in possible_types:
+                    possible_types.append(t[ID])
+            for id_ in type_ids_to_delete:
+                if id_ not in possible_types:
+                    type_ids_to_delete.remove(id_)
+            self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}})
+            self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}})
+
+        return self._response("All semantic types which matched the parameters were deleted", 204)
 
 
     ################ SemanticTypesColumns ################
