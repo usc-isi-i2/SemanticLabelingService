@@ -39,7 +39,7 @@ COLUMNS            = "columns"
 DELETE_ALL         = "deleteAll"
 RETURN_COLUMNS     = "returnColumns"
 RETURN_COLUMN_DATA = "returnColumnData"
-
+#### Query Parameters for bulk add ####
 SHOW_ALL    = "showAllData"
 MODEL_NAMES = "modelNames"
 MODEL_DESC  = "modelDesc"

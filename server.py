@@ -558,7 +558,7 @@ class Models(Resource):
     )
     def get(self):
         """
-        Get model.json models
+        Get bulk add models
         Returns all of the models.  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  Return body will have the following format:
         <pre>
         [
@@ -581,8 +581,8 @@ class Models(Resource):
     )
     def post(self):
         """
-        Add a model.json
-        Add a model.json for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
+        Add a bulk add model
+        Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
         """
         try: return service.models_post(request.args, request.data)
         except: return str(traceback.format_exc()), 500
@@ -598,7 +598,7 @@ class Models(Resource):
     )
     def delete(self):
         """
-        Remove a model.json
+        Remove a bulk add model
         Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
         """
         try: return service.models_delete(request.args)
@@ -612,8 +612,8 @@ class ModelData(Resource):
     )
     def get(self, model_id):
         """
-        Gets the current state of a model.json
-        Returns the current state of the given model.json id
+        Gets the current state of a bulk add model
+        Returns the current state of the given bulk add model id
         """
         try: return service.model_data_get(model_id, request.args)
         except: return str(traceback.format_exc()), 500
@@ -629,7 +629,7 @@ class ModelData(Resource):
     def post(self, model_id):
         """
         Add data to the semantic types
-        Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns.
+        Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns, but faster for large amounts of data.
         """
         try: return service.model_data_post(model_id, request.args, request.data)
         except: return str(traceback.format_exc()), 500
@@ -639,6 +639,6 @@ api.add_resource(Predict, '/predict')
 api.add_resource(SemanticTypes, '/semantic_types')
 api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
 api.add_resource(SemanticTypeColumnData, '/semantic_types/type/<string:column_id>')
-api.add_resource(Models, '/models')
-api.add_resource(ModelData, '/models/<string:model_id>')
+api.add_resource(Models, '/bulk_add_models')
+api.add_resource(ModelData, '/bulk_add_models/<string:model_id>')
 app.run(debug=True, port=config.PORT, use_reloader=False)
