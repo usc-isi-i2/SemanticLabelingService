@@ -1,116 +1,15 @@
-# import os
-# import re
-import json
-
 import validators
-import base64
-import collections
-
-from flask import Response
 from pymongo import MongoClient
 
-
-# from collections import OrderedDict
-#
-# import config
-# import service
-# from search_engine.indexer import Indexer
-# from data_source.data_source import DataSource
-# from semantic_labeling.run_experiments import SemanticLabeler
-
-
-not_allowed_chars = '[\\/*?"<>|\s\t]'
-
-ID_DIVIDER = "-"
-NAMESPACE = "namespace"
-ID = "_id"
-TIMESTAMP = "timestamp"
-TYPEID = "typeId"
-TYPE_ID = "type_id"
-COLUMN_ID = "column_id"
-COLUMNS = "columns"
-DATA = "data"
-DATA_TYPE = "dataType"
-DATA_TYPE_SEMANTIC_TYPE = "type"
-DATA_TYPE_COLUMN = "column"
-DATA_TYPE_MODEL = "model"
-NAME = "name"
-SOURCE = "source"
-
-NAMESPACES = "namespaces"
-COLUMN_NAME = "columnName"
-COLUMN_NAMES = "columnNames"
-SOURCE_NAME = "sourceName"
-SOURCE_NAMES = "sourceNames"
-COLUMN_IDS = "columnIds"
-MODEL = "model"
-MODELS = "models"
-MODEL_NAMES = "modelNames"
-MODEL_DESC = "modelDesc"
-MODEL_IDS = "modelIds"
-CLASS = "class"
-PROPERTY = "property"
-RETURN_COLUMNS = "returnColumns"
-RETURN_COLUMN_DATA = "returnColumnData"
-DELETE_ALL = "deleteAll"
-FORCE = "force"
-SHOW_ALL = "showAllData"
+from service import *
 
 
 class Server(object):
     def __init__(self):
         self.db = MongoClient().data.posts
-        # self.source_map = OrderedDict()
-        # self.indexer = Indexer()
-        # # self.data_set_map[namespace] = source_map
-        #
-        # # Load the data sources
-        # namespace = service.encode("http://schema.org")
-        # folder_path = os.path.join(config.UPLOAD_FOLDER, namespace)
-        # for semantic_type_encoded in os.listdir(folder_path):
-        #     for source_file in os.listdir(os.path.join(folder_path, semantic_type_encoded)):
-        #         for column_encoded in os.listdir(os.path.join(folder_path, semantic_type_encoded, source_file)):
-        #             file_path = os.path.join(folder_path, semantic_type_encoded, source_file, column_encoded)
-        #             source = DataSource(lib.column_path_to_ids(file_path)[1])
-        #             source.read(file_path)
-        #             self.source_map[source_file + column_encoded] = source
-        # namespace_safe = re.sub(not_allowed_chars, "!", namespace).lower()
-        # for source in self.source_map.keys():
-        #     self.source_map[source].save(namespace_safe)
-        print " -- Need to figure out init -- "
 
 
-    @staticmethod
-    def _json_response(json_body, code):
-        return Response(response=str(json.dumps(json_body, ensure_ascii=False, indent=4)), status=code, mimetype="application/json")
-
-
-    @staticmethod
-    def _get_type_id(class_, property_):
-        return base64.b64encode(class_) + ID_DIVIDER + base64.b64encode(property_)
-
-
-    @staticmethod
-    def _get_column_id(type_id, column_name, source_name, model):
-        return type_id + ID_DIVIDER + base64.b64encode(column_name) + ID_DIVIDER + base64.b64encode(source_name) + ID_DIVIDER + base64.b64encode(model)
-
-
-    @staticmethod
-    def _clean_column_output(column, show_data=True):
-        o = collections.OrderedDict()
-        o[COLUMN_ID] = column[ID]
-        o[NAME] = column[COLUMN_NAME]
-        o[SOURCE] = column[SOURCE_NAME]
-        o[MODEL] = column[MODEL]
-        if show_data:
-            o[DATA] = column[DATA]
-        return o
-
-
-    @staticmethod
-    def _clean_columns_output(column_input, show_data):
-        return map(lambda t: Server._clean_column_output(t, show_data), column_input)
-
+    ################ Stuff for use in this file ################
 
     def _create_semantic_type(self, class_, property_, force=False):
         class_ = class_.rstrip("/")
@@ -122,7 +21,7 @@ class Server(object):
             return "Invalid class URI was given", 400
 
         # Actually add the type
-        type_id = self._get_type_id(class_, property_)
+        type_id = get_type_id(class_, property_)
         db_body = {ID: type_id, DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, CLASS: class_, PROPERTY: property_, NAMESPACE: namespace}
         if force:
             self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id})
@@ -135,7 +34,7 @@ class Server(object):
 
 
     def _create_column(self, type_id, column_name, source_name, model, data=[], force=False):
-        column_id = self._get_column_id(type_id, column_name, source_name, model)
+        column_id = get_column_id(type_id, column_name, source_name, model)
         db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model, DATA: data}
         if force:
             self.db.delete_many(db_body)
@@ -229,9 +128,9 @@ class Server(object):
             db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
             for type_ in return_body:
                 db_body[TYPEID] = type_[TYPE_ID]
-                type_[COLUMNS] = self._clean_columns_output(self.db.find(db_body), return_column_data)
+                type_[COLUMNS] = clean_columns_output(self.db.find(db_body), return_column_data)
 
-        return self._json_response(return_body, 200)
+        return json_response(return_body, 200)
 
 
     def semantic_types_post(self, args):
@@ -335,7 +234,7 @@ class Server(object):
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        return self._json_response(self._clean_columns_output(self.db.find(db_body), return_column_data), 200)
+        return json_response(clean_columns_output(self.db.find(db_body), return_column_data), 200)
 
 
     def semantic_types_columns_post(self, type_id, args, body):
@@ -354,7 +253,7 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._json_response(
+        return json_response(
             self._create_column(type_id, column_name, source_name, model, body.split("\n")) if body is not None and body.strip() != "" else self._create_column(type_id, column_name, source_name, model), 201)
 
 
@@ -374,8 +273,9 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._json_response(self._create_column(type_id, column_name, source_name, model, body.split("\n"), True) if body is not None and body.strip() != "" \
-                                       else self._create_column(type_id, column_name, source_name, model, force=True), 201)
+        return json_response(
+            self._create_column(type_id, column_name, source_name, model, body.split("\n"), True) if body is not None and body.strip() != "" else self._create_column(type_id, column_name, source_name, model,
+                                                                                                                                                                      force=True), 201)
 
 
     def semantic_types_columns_delete(self, type_id, args):
@@ -414,7 +314,7 @@ class Server(object):
         result = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}))
         if len(result) < 1: return "No column with that id was found", 404
         if len(result) > 1: return "More than one column was found with that id", 500
-        return self._json_response(self._clean_column_output(result[0]), 200)
+        return json_response(clean_column_output(result[0]), 200)
 
 
     def semantic_types_column_data_post(self, column_id, args, body):
@@ -466,7 +366,7 @@ class Server(object):
         model_desc = args.pop(MODEL_DESC, None)
         show_all = args.pop(SHOW_ALL, None)
         if len(args) > 0:
-            return self._json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
+            return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
         show_all = True if show_all is not None and show_all.lower() == "true" else False
 
         #### Find the model

@@ -1,5 +1,4 @@
 import traceback
-
 from flask import Flask, request
 from flask_cors import CORS
 from flask_restful import Api, Resource
@@ -12,8 +11,7 @@ import service.serverLogic
 app = Flask(__name__, static_folder='../static')
 api = swagger.docs(Api(app), apiVersion='0.2', basePath='/', resourcePath='/', produces=["application/json", "text/html"], api_spec_url='/api/spec', description='Semantic Typing')
 CORS(app)
-
-service = service.serverLogic.Server()  # FIXME: possibly all should not run if this isn't main?
+service = service.serverLogic.Server()
 
 
 ################################################################################################################################
@@ -643,6 +641,4 @@ api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
 api.add_resource(SemanticTypeColumnData, '/semantic_types/type/<string:column_id>')
 api.add_resource(Models, '/models')
 api.add_resource(ModelData, '/models/<string:model_id>')
-
-if __name__ == '__main__':
-    app.run(debug=True, port=config.PORT, use_reloader=False)
+app.run(debug=True, port=config.PORT, use_reloader=False)
