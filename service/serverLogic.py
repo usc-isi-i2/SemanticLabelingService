@@ -46,7 +46,7 @@ class Server(object):
 
 
     def _add_data_to_column(self, column_id, body, replace=False):
-        result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if replace else "$pushAll": {DATA: body.split("\n")}})
+        result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if replace else "$pushAll": {DATA: body}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         return "Column data updated", 201
@@ -256,8 +256,8 @@ class Server(object):
 
         #### Add the column
         return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
-            if body is not None and body.strip() != "" and body.strip() != "{}" \
-            else self._create_column(type_id, column_name, source_name, model), 201
+                   if body is not None and body.strip() != "" and body.strip() != "{}" \
+                   else self._create_column(type_id, column_name, source_name, model), 201
 
 
     def semantic_types_columns_put(self, type_id, args, body):
@@ -277,8 +277,9 @@ class Server(object):
 
         #### Add the column
         return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
-            if body is not None and body.strip() != "" and body.strip() != "{}" \
-            else self._create_column(type_id, column_name, source_name, model), 201
+                   if body is not None and body.strip() != "" and body.strip() != "{}" \
+                   else self._create_column(type_id, column_name, source_name, model), 201
+
 
     def semantic_types_columns_delete(self, type_id, args):
         #### Assert args are valid
@@ -330,7 +331,7 @@ class Server(object):
             return "Invalid arguments, there should be none", 400
 
         #### Add the data
-        return self._add_data_to_column(column_id, body)
+        return self._add_data_to_column(column_id, body.split("\n"))
 
 
     def semantic_types_column_data_put(self, column_id, args, body):
@@ -343,7 +344,7 @@ class Server(object):
             return "Invalid arguments, there should be none", 400
 
         #### Replace the data
-        return self._add_data_to_column(column_id, body, True)
+        return self._add_data_to_column(column_id, body.split("\n"), True)
 
 
     def semantic_types_column_data_delete(self, column_id, args):
@@ -402,6 +403,7 @@ class Server(object):
             return "Invalid message body", 400
         if len(args) > 0:
             return "Invalid arguments, there should be none", 400
+        column_model = "bulk_add"
         # TODO: add model support
 
         #### Assert the required elements exist
@@ -427,7 +429,7 @@ class Server(object):
                     elif semantic_status[1] == 409: existed_type_count += 1
                     elif semantic_status[1] == 400: return semantic_status
                     else: return "Error occurred while adding semantic type: " + str(ust), 500
-                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], "bulk_add")
+                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model)
                     if column_status[1] == 201: new_column_count += 1
                     elif column_status[1] == 409: existed_column_count += 1
                     elif column_status[1] == 400: return column_status
@@ -482,6 +484,31 @@ class Server(object):
             return "Invalid message body", 400
         if len(args) > 0:
             return "Invalid arguments, there should be none", 400
+        column_model = "bulk_add"
+        # TODO: add model support
 
         #### Process the data
-        return "Method partially implemented", 601
+        # Get the model and parse the json lines
+        model = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
+        if len(model) < 1: return "The given model was not found", 404
+        if len(model) > 1: return "More than one model was found with the id", 500
+        model = model[0][BULK_ADD_MODEL_DATA]
+        data = []
+        for line in body.split("\n"):
+            if line.strip() != "":
+                data.append(json.loads(line))
+        # Get all of the data in each column
+        for n in model["graph"]["nodes"]:
+            column_data = []
+            for line in data:
+                if n.get("columnName"):
+                    column_data.append(line[n["columnName"]])
+            # Add it to the db
+            if n.get("userSemanticTypes"):
+                for ust in n["userSemanticTypes"]:
+                    result = self._add_data_to_column(get_column_id(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model), column_data)[1]
+                    if result == 201: continue
+                    elif result == 404: return "A required column was not found", 404
+                    else: return "Error occurred while adding data to the column", 500
+
+        return "Data successfully added to columns", 201
