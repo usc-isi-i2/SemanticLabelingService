@@ -255,9 +255,7 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
-                   if body is not None and body.strip() != "" and body.strip() != "{}" \
-                   else self._create_column(type_id, column_name, source_name, model), 201
+        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
 
 
     def semantic_types_columns_put(self, type_id, args, body):
@@ -276,9 +274,7 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
-                   if body is not None and body.strip() != "" and body.strip() != "{}" \
-                   else self._create_column(type_id, column_name, source_name, model), 201
+        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
 
 
     def semantic_types_columns_delete(self, type_id, args):
@@ -361,7 +357,7 @@ class Server(object):
         return "Column data deleted", 200
 
 
-    ################ Models ################
+    ################ BulkAddModels ################
 
     def bulk_add_models_get(self, args):
         #### Assert args are valid
@@ -464,7 +460,7 @@ class Server(object):
         return str(deleted_count) + " models deleted successfully", 200
 
 
-    ################ ModelData ################
+    ################ BulkAddModelData ################
 
     def bulk_add_model_data_get(self, model_id, args):
         if model_id is None or len(model_id) < 1:
