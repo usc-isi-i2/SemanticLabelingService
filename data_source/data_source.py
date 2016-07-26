@@ -131,6 +131,7 @@ class DataSource:
                     self.entity_list.append(entity)
 
     def save(self, index_name):
+        self.learn_relation(True)
         for attr in self.attr_map.values():
             if attr.semantic_type and attr.value_list:
                 attr.save(self.name, index_name)
@@ -153,11 +154,10 @@ class DataSource:
         for key in relation_map.keys():
             for idx1, obj1 in enumerate(prediction_map[key[0]]):
                 for idx2, obj2 in enumerate(prediction_map[key[1]]):
-                    relation_score = Searcher.search_relations_data(obj1["semantic_type"], obj2["semantic_type"],
-                                                                    relation_map[key])
+                    relation_score = Searcher.get_relation_score(obj1["semantic_type"], obj2["semantic_type"],
+                                                                 relation_map[key])
                     prediction_map[key[0]][idx1]["prob"] += relation_score
                     prediction_map[key[1]][idx2]["prob"] += relation_score
-
         return prediction_map
 
     def learn_relation(self, is_saving=False):
@@ -165,7 +165,7 @@ class DataSource:
         for attr1 in self.attr_map.values():
             for attr2 in self.attr_map.values():
                 for test in relation_test_map.keys():
-                    if relation_test_map[test](attr1, attr2):
+                    if relation_test_map[test](attr1.value_list, attr2.value_list):
                         flag = True
                         relation_map[(attr1.name, attr2.name)] = test
                     else:
@@ -236,11 +236,9 @@ class Attribute:
     def to_json(self):
         self.prepare_data()
         json_obj = {"name": self.name, "source_name": self.source_name, "semantic_type": self.semantic_type,
-                    "num_fraction": self.num_fraction, KS_NUM: self.numeric_list, JC_NUM: self.numeric_list,
-                    JC_TEXT: list(set(self.textual_list)),
-                    # JC_FULL_TEXT: re.findall(r"\w+|[^\w\s]", " ".join(self.value_list), re.UNICODE),
-                    MW_HIST: self.frequency_list, EL_DIST: self.numeric_list,
-                    JC_NAME: self.name, TF_TEXT: self.text}
+                    "num_fraction": self.num_fraction, "value_list": self.value_list, KS_NUM: self.numeric_list,
+                    JC_NUM: self.numeric_list, JC_TEXT: list(set(self.textual_list)), MW_HIST: self.frequency_list,
+                    EL_DIST: self.numeric_list, JC_NAME: self.name, TF_TEXT: self.text,}
         return json_obj
 
     def compute_features(self, index_name, labeled_sources, labeled_attrs_map):
@@ -274,8 +272,18 @@ class Attribute:
 
         return predictions
 
-    def save(self, source_name, index_name):
-        Indexer.index_column(self, source_name, index_name)
+    def save(self, index_name):
+        Indexer.index_column(self, self.source_name, index_name)
+
+    def update(self, index_name):
+        value_list = Searcher.search_column_data_by_name(self.name, self.source_name, index_name)["value_list"]
+        for value in value_list:
+            self.add_value(value)
+        Indexer.delete_column(self.name, self.source_name, index_name)
+        Indexer.index_column(self, self.source_name, index_name)
+
+    def delete(self, index_name):
+        Indexer.delete_column(self.name, self.source_name, index_name)
 
     def prepare_data(self):
         if not self.is_prepared:

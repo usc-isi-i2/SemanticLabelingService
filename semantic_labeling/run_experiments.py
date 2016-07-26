@@ -40,7 +40,7 @@ class SemanticLabeler:
 
 if __name__ == "__main__":
     labeler = SemanticLabeler("LOGISTIC")
-    labeler.store_data_sets(["museum2", "city2", "soccer2", "weather2"])
+    labeler.store_data_sets(["soccer2", "weather2"])
     # sizes = random.sample(range([1, 2, 3, 4, 5]), 2)
     labeler.train_classifier({"soccer2": [1]})
     labeler.test_semantic_typing1(

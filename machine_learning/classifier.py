@@ -8,7 +8,7 @@ from semantic_labeling import features, DEBUG
 
 
 class Classifier(object):
-    def __init__(self, train_data_map):
+    def __init__(self, train_data_map=None):
         self.train_data_map = train_data_map
         self.model = None
 
