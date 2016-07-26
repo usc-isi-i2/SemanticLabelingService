@@ -9,15 +9,17 @@ NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'  # Characters not allowed by elastic searc
 ID_DIVIDER        = "-"                # The divider that is used to separate the different parts of ID's, like class and property
 
 ######## Mongodb Names ########
-ID                      = "_id"       # ID for any entry in the db
-DATA_TYPE               = "dataType"  # Name for the type of data the entry in the db is, should be used with one of the constants here like DATA_TYPE_SEMANTIC_TYPE
-DATA_TYPE_SEMANTIC_TYPE = "type"      # Name for the Semantic Type, should be used with DATA_TYPE
-DATA_TYPE_COLUMN        = "column"    # Name for the Semantic Type's column, should be used with DATA_TYPE
-DATA_TYPE_MODEL         = "model"     # Name for the karma model that is uploaded, should be used with DATA_TYPE
-TYPEID                  = "typeId"    # A column's semantic type's id
-DATA                    = "data"      # Name for a column's data in the db
-NAME                    = "name"      # A column's name
-SOURCE                  = "source"    # A column's source
+ID                      = "_id"          # ID for any entry in the db
+DATA_TYPE               = "dataType"     # Name for the type of data the entry in the db is, should be used with one of the constants here like DATA_TYPE_SEMANTIC_TYPE
+DATA_TYPE_SEMANTIC_TYPE = "type"         # Name for the Semantic Type, should be used with DATA_TYPE
+DATA_TYPE_COLUMN        = "column"       # Name for the Semantic Type's column, should be used with DATA_TYPE
+DATA_TYPE_MODEL         = "model"        # Name for the karma model that is uploaded, should be used with DATA_TYPE
+TYPEID                  = "typeId"       # A column's semantic type's id
+DATA                    = "data"         # Name for a column's data in the db
+NAME                    = "name"         # A column's name
+SOURCE                  = "source"       # A column's source
+DESC                    = "description"  # Bulk add model description
+BULK_ADD_MODEL_DATA     = "bulkAddData"  # The full model that was given to the POST /bulk_add_models
 
 ######## Path Parameters ########
 COLUMN_ID = "column_id"
@@ -39,11 +41,12 @@ COLUMNS            = "columns"
 DELETE_ALL         = "deleteAll"
 RETURN_COLUMNS     = "returnColumns"
 RETURN_COLUMN_DATA = "returnColumnData"
-#### Query Parameters for bulk add ####
+#### Query parameters and return values for bulk add ####
 SHOW_ALL    = "showAllData"
 MODEL_NAMES = "modelNames"
 MODEL_DESC  = "modelDesc"
 MODEL_IDS   = "modelIds"
+MODEL_ID    = "modelId"
 
 
 def json_response(json_body, code):

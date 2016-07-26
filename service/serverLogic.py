@@ -130,6 +130,7 @@ class Server(object):
                 db_body[TYPEID] = type_[TYPE_ID]
                 type_[COLUMNS] = clean_columns_output(self.db.find(db_body), return_column_data)
 
+        if len(return_body) < 1: return "No Semantic types matching the given parameters were found", 404
         return json_response(return_body, 200)
 
 
@@ -177,8 +178,7 @@ class Server(object):
 
         #### Delete the types
         if delete_all and delete_all.lower() == "true":
-            self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE, DATA_TYPE_COLUMN]}})
-            return "All semantic types and their data was deleted", 204
+            return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE, DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
         # Find the parent semantic types and everything below them of everything which meets column requirements
         type_ids_to_delete = []
@@ -198,7 +198,7 @@ class Server(object):
         if property_ is not None: db_body[PROPERTY] = property_
         if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
         if source_names is None and column_names is None and column_ids is None and models is None:
-            self.db.delete_many(db_body)
+            deleted = self.db.delete_many(db_body).deleted_count
         else:
             for t in self.db.find(db_body):
                 if t[ID] not in possible_types:
@@ -206,10 +206,10 @@ class Server(object):
             for id_ in type_ids_to_delete:
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
-            self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}})
+            deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}).deleted_count
             self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}})
 
-        return "All semantic types which matched the parameters were deleted", 204
+        return deleted + " semantic types matched parameters and were deleted", 200
 
 
     ################ SemanticTypesColumns ################
@@ -234,7 +234,9 @@ class Server(object):
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        return json_response(clean_columns_output(self.db.find(db_body), return_column_data), 200)
+        result = self.db.find(db_body)
+        if len(list(result)) < 1: return "No columns matching the given parameters were found", 404
+        return json_response(clean_columns_output(result, return_column_data), 200)
 
 
     def semantic_types_columns_post(self, type_id, args, body):
@@ -253,8 +255,9 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return json_response(
-            self._create_column(type_id, column_name, source_name, model, body.split("\n")) if body is not None and body.strip() != "" else self._create_column(type_id, column_name, source_name, model), 201)
+        return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
+            if body is not None and body.strip() != "" and body.strip() != "{}" \
+            else self._create_column(type_id, column_name, source_name, model), 201
 
 
     def semantic_types_columns_put(self, type_id, args, body):
@@ -273,10 +276,9 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return json_response(
-            self._create_column(type_id, column_name, source_name, model, body.split("\n"), True) if body is not None and body.strip() != "" else self._create_column(type_id, column_name, source_name, model,
-                                                                                                                                                                      force=True), 201)
-
+        return self._create_column(type_id, column_name, source_name, model, body.split("\n")) \
+            if body is not None and body.strip() != "" and body.strip() != "{}" \
+            else self._create_column(type_id, column_name, source_name, model), 201
 
     def semantic_types_columns_delete(self, type_id, args):
         #### Assert args are valid
@@ -296,9 +298,10 @@ class Server(object):
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        self.db.delete_many(db_body)
+        deleted_count = self.db.delete_many(db_body).deleted_count
 
-        return "Columns deleted successfully", 204
+        if deleted_count < 1: return "No columns were found with the given parameters", 404
+        return str(deleted_count) + " columns deleted successfully", 200
 
 
     ################ SemanticTypesColumnData ################
@@ -354,14 +357,16 @@ class Server(object):
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set": {DATA: []}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
-        return "Column data deleted", 204
+        return "Column data deleted", 200
 
 
+    # TODO: Rename all of these so they fit the naming convention
     ################ Models ################
 
     def models_get(self, args):
         #### Assert args are valid
         args = args.copy()
+        model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
         show_all = args.pop(SHOW_ALL, None)
@@ -370,7 +375,25 @@ class Server(object):
         show_all = True if show_all is not None and show_all.lower() == "true" else False
 
         #### Find the model
-        return "Method partially implemented", 601
+        db_body = {DATA_TYPE: DATA_TYPE_MODEL}
+        if model_ids is not None: db_body[ID] = {"$in": model_ids}
+        if model_names is not None: db_body[NAME] = {"$in": model_names}
+        if model_desc is not None: db_body[MODEL_DESC] = model_desc
+        db_result = list(self.db.find(db_body))
+        if len(db_result) < 1: return "No models were found with the given parameters", 404
+
+        # Construct the return body
+        return_body = []
+        for mod in db_result:
+            o = collections.OrderedDict()
+            o[MODEL_ID] = mod[ID]
+            o[NAME] = mod[NAME]
+            o[DESC] = mod[DESC]
+            if show_all:
+                # TODO: possibly update the learned semantic types here
+                o[MODEL] = mod[BULK_ADD_MODEL_DATA]
+            return_body.append(o)
+        return json_response(return_body, 601)
 
 
     def models_post(self, args, body):
@@ -379,23 +402,65 @@ class Server(object):
             return "Invalid message body", 400
         if len(args) > 0:
             return "Invalid arguments, there should be none", 400
+        # TODO: add model support
 
-        #### Add the model
+        #### Assert the required elements exist
+        model = json.loads(body)
+        if "id" not in model: return "The given model must have an id", 400
+        if "name" not in model: return "The given model must have a name", 400
+        if "description" not in model: return "The given model must have a description", 400
+        if "graph" not in model: return "The given model must have a graph", 400
+        if "nodes" not in model["graph"]: return "The given model must have nodes within the graph", 400
+        if len(list(self.db.find({ID: model["id"]}))) > 0: return "Model id already exists", 409
 
-        return "Method partially implemented", 601
+        #### Parse and add the model
+        # Try to add of the given semantic types and columns
+        new_type_count = 0
+        new_column_count = 0
+        existed_type_count = 0
+        existed_column_count = 0
+        for n in model["graph"]["nodes"]:
+            if n.get("userSemanticTypes"):
+                for ust in n["userSemanticTypes"]:
+                    semantic_status = self._create_semantic_type(ust["domain"]["uri"], ust["type"]["uri"])
+                    if semantic_status[1] == 201: new_type_count += 1
+                    elif semantic_status[1] == 409: existed_type_count += 1
+                    elif semantic_status[1] == 400: return semantic_status
+                    else: return "Error occurred while adding semantic type: " + str(ust), 500
+                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], "bulk_add")
+                    if column_status[1] == 201: new_column_count += 1
+                    elif column_status[1] == 409: existed_column_count += 1
+                    elif column_status[1] == 400: return column_status
+                    else: return "Error occurred while adding column for semantic type: " + str(ust), 500
+
+        # Nothing bad happened when creating the semantic types and columns, so add the model to the DB
+        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"], BULK_ADD_MODEL_DATA: model})
+        return "Model and columns added, " + str(new_type_count) + " semantic types created, " + \
+               str(existed_type_count) + " semantic types already existed, " + \
+               str(new_column_count) + " columns created, and " + \
+               str(existed_column_count) + " columns already existed.", 201
 
 
     def models_delete(self, args):
         #### Assert args are valid
         args = args.copy()
+        no_args = len(args) < 1
         model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
         if len(args) > 0:
             return "The following query parameters are invalid:  " + str(args.keys()), 400
 
-        #### Find the model
-        return "Method partially implemented", 601
+        #### Delete the model
+        db_body = {DATA_TYPE: DATA_TYPE_MODEL}
+        if not no_args:
+            if model_ids is not None: db_body[ID] = {"$in": model_ids}
+            if model_names is not None: db_body[NAME] = {"$in": model_names}
+            if model_desc is not None: db_body[MODEL_DESC] = model_desc
+        deleted_count = self.db.delete_many(db_body).deleted_count
+
+        if deleted_count < 1: return "No models were found with the given parameters", 404
+        return str(deleted_count) + " models deleted successfully", 200
 
 
     ################ ModelData ################

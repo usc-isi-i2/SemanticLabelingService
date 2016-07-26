@@ -179,7 +179,7 @@ class parameters(object):
             "required": required,
             "allowMultiple": multiple,
             "dataType": "string",
-            "paramType": "path"
+            "paramType": param_type
         }
 
 
@@ -216,7 +216,7 @@ class responses(object):
     @staticmethod
     def standard_delete():
         return [
-            {"code": 204, "message": "Deleted"},
+            {"code": 200, "message": "Deleted"},
             {"code": 400, "message": "Bad Request"},
             {"code": 404, "message": "Not Found"},
             {"code": 500, "message": "Internal Server Error"}
@@ -543,6 +543,7 @@ class SemanticTypeColumnData(Resource):
 class Models(Resource):
     @swagger.operation(
         parameters=[
+            parameters.model_id(),
             parameters.model_names(),
             parameters.model_desc(),
             {
@@ -559,11 +560,11 @@ class Models(Resource):
     def get(self):
         """
         Get bulk add models
-        Returns all of the models.  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  Return body will have the following format:
+        Returns all of the models which fit all of the given parameters (and all of them if no parameters are given).  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  Return body will have the following format:
         <pre>
         [
             {
-                "id": "",
+                "modelId": "",
                 "name": "",
                 "description": "",
                 "model": { ... }
@@ -582,7 +583,7 @@ class Models(Resource):
     def post(self):
         """
         Add a bulk add model
-        Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types given in the model will be created when this is sent.
+        Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types and columns given in the model will be created when this is sent.
         """
         try: return service.models_post(request.args, request.data)
         except: return str(traceback.format_exc()), 500
@@ -594,7 +595,7 @@ class Models(Resource):
             parameters.model_names(),
             parameters.model_desc(),
         ],
-        responseMessages=responses.standard_get()
+        responseMessages=responses.standard_delete()
     )
     def delete(self):
         """
