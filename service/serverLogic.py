@@ -361,10 +361,9 @@ class Server(object):
         return "Column data deleted", 200
 
 
-    # TODO: Rename all of these so they fit the naming convention
     ################ Models ################
 
-    def models_get(self, args):
+    def bulk_add_models_get(self, args):
         #### Assert args are valid
         args = args.copy()
         model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
@@ -397,7 +396,7 @@ class Server(object):
         return json_response(return_body, 601)
 
 
-    def models_post(self, args, body):
+    def bulk_add_models_post(self, args, body):
         #### Assert args are valid
         if body is None or len(body) < 1:
             return "Invalid message body", 400
@@ -443,7 +442,7 @@ class Server(object):
                str(existed_column_count) + " columns already existed.", 201
 
 
-    def models_delete(self, args):
+    def bulk_add_models_delete(self, args):
         #### Assert args are valid
         args = args.copy()
         no_args = len(args) < 1
@@ -467,7 +466,7 @@ class Server(object):
 
     ################ ModelData ################
 
-    def model_data_get(self, model_id, args):
+    def bulk_add_model_data_get(self, model_id, args):
         if model_id is None or len(model_id) < 1:
             return "Invalid model_id", 400
         if len(args) > 0:
@@ -482,7 +481,7 @@ class Server(object):
         return json_response(db_result[BULK_ADD_MODEL_DATA], 601)
 
 
-    def model_data_post(self, model_id, args, body):
+    def bulk_add_model_data_post(self, model_id, args, body):
         if model_id is None or len(model_id) < 1:
             return "Invalid model_id", 400
         if body is None or len(body) < 1:
