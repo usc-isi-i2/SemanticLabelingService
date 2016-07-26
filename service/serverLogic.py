@@ -401,10 +401,10 @@ class Server(object):
         #### Assert args are valid
         if body is None or len(body) < 1:
             return "Invalid message body", 400
+        column_model = args.pop(MODEL, None)
         if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
-        column_model = "bulk_add"
-        # TODO: add model support
+            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if column_model is None: column_model = "bulk_add"
 
         #### Assert the required elements exist
         model = json.loads(body)
@@ -474,7 +474,12 @@ class Server(object):
             return "Invalid arguments, there should be none", 400
 
         #### Get the model
-        return "Method partially implemented", 601
+        db_result = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
+        if len(db_result) < 1: return "A model was not found with the given id", 404
+        if len(db_result) > 1: return "More than one model was found with the given id", 500
+        db_result = db_result[0]
+        # TODO: possibly update the learned semantic types here
+        return json_response(db_result[BULK_ADD_MODEL_DATA], 601)
 
 
     def model_data_post(self, model_id, args, body):
@@ -482,10 +487,10 @@ class Server(object):
             return "Invalid model_id", 400
         if body is None or len(body) < 1:
             return "Invalid message body", 400
+        column_model = args.pop(MODEL, None)
         if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
-        column_model = "bulk_add"
-        # TODO: add model support
+            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if column_model is None: column_model = "bulk_add"
 
         #### Process the data
         # Get the model and parse the json lines

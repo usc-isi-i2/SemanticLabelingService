@@ -551,7 +551,7 @@ class Models(Resource):
                 "description": "Show all of the model data",
                 "required": False,
                 "allowMultiple": False,
-                "dataType": 'boolean',
+                "dataType": "boolean",
                 "paramType": "query"
             }
         ],
@@ -577,7 +577,17 @@ class Models(Resource):
 
 
     @swagger.operation(
-        parameters=[parameters.body(True, "The model.json file")],
+        parameters=[
+            {
+                "name": "model",
+                "description": "The model for each of the created columns to be, if none is given 'bulk_add' will be used",
+                "required": False,
+                "allowMultiple": False,
+                "dataType": "string",
+                "paramType": "query"
+            },
+            parameters.body(True, "The model.json file")
+        ],
         responseMessages=responses.standard_put()
     )
     def post(self):
@@ -623,6 +633,14 @@ class ModelData(Resource):
     @swagger.operation(
         parameters=[
             parameters.model_id(True, False, "path"),
+            {
+                "name": "model",
+                "description": "The model of the columns the data should be sent to, if none is given 'bulk_add' will be used",
+                "required": False,
+                "allowMultiple": False,
+                "dataType": "string",
+                "paramType": "query"
+            },
             parameters.body(True, "The jsonlines which contain the data to add")
         ],
         responseMessages=responses.standard_put()
