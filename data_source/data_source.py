@@ -1,15 +1,19 @@
 import csv
 import locale
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 
 import math
 
 import itertools
 
+import re
+from string import digits
+
 from search_engine.indexer import Indexer
 from search_engine.searcher import Searcher
-from semantic_labeling import KS_NUM, JC_NUM, JC_TEXT, MW_HIST, JC_NAME, TF_TEXT, debug_writer, JC_FULL_TEXT
+from semantic_labeling import KS_NUM, JC_NUM, JC_TEXT, MW_HIST, JC_NAME, TF_TEXT, debug_writer, JC_FULL_TEXT, KS_FRAC, \
+    KS_LENGTH, EL_DIST, relations, relation_test_map
 from semantic_labeling.feature_computing import compute_feature_vectors
 from utils.helpers import split_number_text
 
@@ -17,9 +21,11 @@ from utils.helpers import split_number_text
 class DataSet:
     def __init__(self, name):
         self.name = name
+        self.folder_path = None
         self.source_map = {}
 
     def read(self, folder_path):
+        self.folder_path = folder_path
         is_saved = self.is_saved()
         for file_path in os.listdir(folder_path):
             print file_path
@@ -41,8 +47,10 @@ class DataSet:
         for size in size_list:
             score = 0
             count = 0
-            for idx, source in enumerate(self.source_map.values()):
+            for idx, key in enumerate(sorted(self.source_map.keys())):
+                source = self.source_map[key]
                 labeled_sources, labeled_attrs_map = self.get_labeled_sources(idx, size)
+                print key, labeled_sources
                 for attr in source.attr_map.values():
                     if attr.semantic_type and attr.value_list:
                         predictions = attr.predict_type(self.name, labeled_sources, labeled_attrs_map, classifier)
@@ -50,8 +58,8 @@ class DataSet:
                         count += 1
                         for prediction in predictions:
                             rank += 1
-                            debug_writer.write(
-                                attr.name + "\t" + attr.semantic_type + "\t" + str(prediction) + "\n")
+                            debug_writer.write(source.name + "\t" +
+                                               attr.name + "\t" + attr.semantic_type + "\t" + str(prediction) + "\n")
                             if prediction["semantic_type"] == attr.semantic_type:
                                 break
                         score += 1.0 / rank
@@ -59,8 +67,28 @@ class DataSet:
             mrr_scores[size] = score * 1.0 / count
         return mrr_scores
 
-    def get_labeled_sources(self, idx, size):
-        double_list = self.source_map.keys() * 2
+    def predict_with_different_set(self, classifier, set_name, labeled_sources):
+        semantic_type_map = defaultdict(lambda: {})
+        for source in self.source_map.values():
+            labeled_attrs_map = Searcher.search_columns_data(set_name, labeled_sources)
+            for attr in source.attr_map.values():
+                if attr.semantic_type and attr.value_list:
+                    prediction = attr.predict_type(self.name, labeled_sources, labeled_attrs_map, classifier)[0]
+                    semantic_type_map[source.name][attr.semantic_type] = prediction["semantic_type"]
+        for file_name in os.listdir(self.folder_path):
+            file_path = os.path.join(self.folder_path, file_name)
+            source_name = os.path.splitext(file_name)[0]
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+                for key in semantic_type_map[source_name].keys():
+                    lines[0] = lines[0].replace('"%s"' % str(key).translate(None, digits),
+                                                semantic_type_map[source_name][key])
+            with open(file_path, "w") as f:
+                for line in lines:
+                    f.write(line)
+
+    def get_labeled_sources(self, idx=0, size=0, ):
+        double_list = sorted(self.source_map.keys()) * 2
         labeled_sources = double_list[idx + 1: idx + size + 1]
         labeled_attrs_map = Searcher.search_columns_data(self.name, labeled_sources)
         return labeled_sources, labeled_attrs_map
@@ -71,7 +99,7 @@ class DataSet:
             for idx, source in enumerate(self.source_map.values()):
                 labeled_sources, labeled_attrs_map = self.get_labeled_sources(idx, size)
                 for attr in source.attr_map.values():
-                    if attr.semantic_type:
+                    if attr.semantic_type and attr.value_list:
                         feature_vectors = attr.compute_features(self.name, labeled_sources, labeled_attrs_map)
                         train_data += feature_vectors
         return train_data
@@ -112,9 +140,40 @@ class DataSource:
         for attr in self.attr_map.values():
             if attr.semantic_type:
                 tf_idf_map = Searcher.search_similar_text_data(self.name, attr.text, labeled_sources)
-                predictions = attr.predict_type(labeled_attrs_map, tf_idf_map, classifier)
-                result[attr.name] = predictions
+                prediction = attr.predict_type(labeled_attrs_map, tf_idf_map, classifier)
+                result[attr.name] = prediction
         return result
+
+    def align_semantic_type(self, prediction_map):
+        prediction_map = sorted(prediction_map, key=lambda x: (-len(x), x[0]["prob"] - x[1]["prob"], x[0]["prob"]),
+                                reverse=True)
+
+        relation_map = self.learn_relation()
+
+        for key in relation_map.keys():
+            for idx1, obj1 in enumerate(prediction_map[key[0]]):
+                for idx2, obj2 in enumerate(prediction_map[key[1]]):
+                    relation_score = Searcher.search_relations_data(obj1["semantic_type"], obj2["semantic_type"],
+                                                                    relation_map[key])
+                    prediction_map[key[0]][idx1]["prob"] += relation_score
+                    prediction_map[key[1]][idx2]["prob"] += relation_score
+
+        return prediction_map
+
+    def learn_relation(self, is_saving=False):
+        relation_map = {}
+        for attr1 in self.attr_map.values():
+            for attr2 in self.attr_map.values():
+                for test in relation_test_map.keys():
+                    if relation_test_map[test](attr1, attr2):
+                        flag = True
+                        relation_map[(attr1.name, attr2.name)] = test
+                    else:
+                        flag = False
+                        relation_map[(attr1.name, attr2.name)] = None
+                    if is_saving:
+                        Indexer.index_relation(test, attr1.semantic_type, attr2.semantic_type, flag)
+        return relation_map
 
 
 class Entity:
@@ -140,28 +199,37 @@ class Attribute:
         self.numeric_list = []
         self.frequency_list = []
         self.textual_list = []
-        self.fingerprint_list = []
 
         self.is_prepared = False
         self.num_fraction = 0
 
-    def add_value(self, value):
-        value = value.strip()
+        self.num_len = 0
+        self.text_len = 0
 
-        if not value:
+    def add_value(self, value):
+        if len(self.value_list) > 500:
             return
+
+        value = value.strip()
 
         try:
             value = value.encode("ascii", "ignore")
         except:
             value = value.decode("unicode_escape").encode("ascii", "ignore")
 
+        if not value:
+            return
+
         num, text = split_number_text(value)
 
         if text:
             self.textual_list.append(text)
+            self.text_len += len(text)
+            # self.text_len += 1
         if num:
             self.numeric_list.append(max([locale.atof(v[0]) for v in num]))
+            self.num_len += sum([len(n) for n in num])
+            # self.num_len += 1
 
         self.value_list.append(value)
 
@@ -169,7 +237,9 @@ class Attribute:
         self.prepare_data()
         json_obj = {"name": self.name, "source_name": self.source_name, "semantic_type": self.semantic_type,
                     "num_fraction": self.num_fraction, KS_NUM: self.numeric_list, JC_NUM: self.numeric_list,
-                    JC_TEXT: self.textual_list, JC_FULL_TEXT: self.text, MW_HIST: self.frequency_list,
+                    JC_TEXT: list(set(self.textual_list)),
+                    # JC_FULL_TEXT: re.findall(r"\w+|[^\w\s]", " ".join(self.value_list), re.UNICODE),
+                    MW_HIST: self.frequency_list, EL_DIST: self.numeric_list,
                     JC_NAME: self.name, TF_TEXT: self.text}
         return json_obj
 
@@ -190,14 +260,14 @@ class Attribute:
         else:
             predictions.to_csv("debug.csv", mode='w', header=True)
 
-        predictions = predictions[["prob", 'semantic_type']].T.to_dict().values()
+        predictions = predictions[["prob", 'semantic_type', "column_name"]].T.to_dict().values()
 
         semantic_type_set = set()
 
         predictions = sorted(predictions, key=lambda x: x["prob"], reverse=True)
 
         for prediction in predictions:
-            if prediction["semantic_type"] in semantic_type_set:
+            if prediction["semantic_type"] in semantic_type_set or prediction["prob"] < 0.5:
                 predictions.remove(prediction)
             else:
                 semantic_type_set.add(prediction["semantic_type"])
@@ -210,12 +280,14 @@ class Attribute:
     def prepare_data(self):
         if not self.is_prepared:
             self.is_prepared = True
-            self.num_fraction = len(self.numeric_list) * 1.0 / (len(self.numeric_list) + len(self.textual_list))
+            self.num_fraction = self.num_len * 1.0 / (self.num_len + self.text_len)
             self.frequency_list = sorted(
                 [count * 1.0 / len(self.value_list) for count in Counter(self.value_list).values()])
             self.frequency_list = [[idx] * int(math.ceil(freq * 100)) for idx, freq in enumerate(self.frequency_list)]
             self.frequency_list = list(itertools.chain(*self.frequency_list))
-            self.text = " ".join(self.textual_list)
+            # if max(self.frequency_list) > 50:
+            #     self.frequency_list = []
+            self.text = " ".join(self.value_list)
 
 
 class TimeSeriesAttribute(Attribute):

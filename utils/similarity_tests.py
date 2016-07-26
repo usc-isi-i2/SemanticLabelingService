@@ -1,4 +1,5 @@
-from numpy import percentile
+from numpy import linalg
+from scipy.spatial.distance import euclidean
 from scipy.stats import ks_2samp, mannwhitneyu
 
 from utils.helpers import adjust_result
@@ -17,9 +18,21 @@ def mw_histogram_sim(list1, list2, num_fraction1, num_fraction2):
 
 
 def jaccard_name_sim(str1, str2, num_fraction1, num_fraction2):
-    tokens1 = [str1[i:i + 2] for i in range(len(str1) - 1)]
-    tokens2 = [str2[i:i + 2] for i in range(len(str2) - 1)]
+    tokens1 = [str1[i:i + 2] for i in range(len(str1.lower()) - 1)]
+    tokens2 = [str2[i:i + 2] for i in range(len(str2.lower()) - 1)]
     return jaccard_similarity(tokens1, tokens2)
+
+
+def euclid_dist_sim(list1, list2, num_fraction1, num_fraction2):
+    if not list1 or not list2:
+        return 0
+    if len(list1) > len(list2):
+        list1 = list1[:len(list2)]
+    else:
+        list2 = list2[:len(list1)]
+    result = euclidean(list1, list2) / (linalg.norm(list1) + linalg.norm(list2))
+    # print result
+    return adjust_result(num_fraction1, num_fraction2, result)
 
 
 def jaccard_str_sim(list1, list2, num_fraction1, num_fraction2):
@@ -30,10 +43,18 @@ def jaccard_str_sim(list1, list2, num_fraction1, num_fraction2):
 
 def jaccard_num_sim(list1, list2, num_fraction1, num_fraction2):
     if len(list1) > 0 and len(list2) > 0:
-        max1 = percentile(list1, 75)
-        min1 = percentile(list1, 25)
-        max2 = percentile(list2, 75)
-        min2 = percentile(list2, 25)
+        # max1 = percentile(list1, 75)
+        # min1 = percentile(list1, 25)
+        # max2 = percentile(list2, 75)
+        # min2 = percentile(list2, 25)
+        # max1 = percentile(list1, 90)
+        # min1 = percentile(list1, 10)
+        # max2 = percentile(list2, 90)
+        # min2 = percentile(list2, 10)
+        max1 = max(list1)
+        min1 = min(list1)
+        max2 = max(list2)
+        min2 = min(list2)
         max3 = max(max1, max2)
         min3 = min(min1, min2)
         if min2 > max1 or min1 > max2:
@@ -48,11 +69,9 @@ def jaccard_num_sim(list1, list2, num_fraction1, num_fraction2):
     return 0
 
 
-def jaccard_text_sim(text1, text2, num_fraction1, num_fraction2):
-    list1 = text1.split()
-    list2 = text2.split()
+def jaccard_text_sim(list1, list2, num_fraction1, num_fraction2):
     if len(list1) > 0 and len(list2) > 0:
-        return adjust_result(1 - num_fraction1, 1 - num_fraction2, jaccard_similarity(list1, list2))
+        return jaccard_similarity(list1, list2)
     return 0
 
 

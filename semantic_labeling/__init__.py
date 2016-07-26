@@ -1,8 +1,17 @@
+from pymongo import MongoClient
+
 from pyspark import SparkContext
+from utils.relation_tests import greater, less, equal, contains
 from utils.similarity_tests import ks_distribution_sim, mw_histogram_sim, jaccard_num_sim, jaccard_str_sim, \
-    jaccard_name_sim, jaccard_text_sim
+    jaccard_name_sim, euclid_dist_sim
 
 sc = SparkContext()
+db = MongoClient()
+
+DEBUG = False
+
+data_collection = db["data"]
+relation_collection = db["relation"]
 
 debug_writer = open('debug.txt', 'w')
 
@@ -13,11 +22,19 @@ JC_TEXT = "jc_text"
 JC_NAME = "jc_name"
 TF_TEXT = "tf_text"
 JC_FULL_TEXT = "jc_full_text"
+KS_LENGTH = "ks_length"
+KS_FRAC = "ks_frac"
+EL_DIST = "el_dist"
+
+GREATER = "greater"
+LESS = "less"
+EQUAL = "equal"
+CONTAIN_IN = "contain_in"
 
 similarity_test_map = {KS_NUM: ks_distribution_sim, MW_HIST: mw_histogram_sim, JC_NUM: jaccard_num_sim,
-                       JC_TEXT: jaccard_str_sim, JC_NAME: jaccard_name_sim, JC_FULL_TEXT: jaccard_text_sim}
+                       JC_TEXT: jaccard_str_sim, JC_NAME: jaccard_name_sim, EL_DIST: euclid_dist_sim}
 
-DEBUG = False
+relation_test_map = {GREATER: greater, LESS: less, EQUAL: equal, CONTAIN_IN: contains}
 
-
-features = [KS_NUM, JC_NUM, JC_TEXT, JC_NAME, JC_FULL_TEXT]
+features = [JC_TEXT, JC_NUM, TF_TEXT, KS_NUM, MW_HIST]
+relations = [GREATER, LESS, EQUAL, CONTAIN_IN]

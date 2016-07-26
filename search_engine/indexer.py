@@ -1,4 +1,5 @@
 from search_engine import es
+from semantic_labeling import data_collection, relation_collection
 
 
 class Indexer:
@@ -18,14 +19,17 @@ class Indexer:
             if key in ["name", "semantic_type", "source_name", "num_fraction"]:
                 continue
             obj[key] = body[key]
+            obj["set_name"] = index_name
             obj["metric_type"] = key
-            es.index(index=index_name, doc_type=source_name, body=obj)
+            data_collection.insert_one(obj)
+            # es.index(index=index_name, doc_type=source_name, body=obj)
 
     @staticmethod
-    def index_source(source, index_name):
-        for column in source.column_map.values():
-            if column.semantic_type:
-                Indexer.index_column(column, source.index_name, index_name)
+    def index_relation(relation, type1, type2, flag):
+        query = {"type1": type1, "type2": type2, "relation": relation}
+        relation_collection.update(query, {"$inc": {"true_count": 1 if flag else 0, "total_count": 1}},
+                                   {"$setOnInsert": {"true_count": 1 if flag else 0, "total_count": 1}},
+                                   {"upsert": True})
 
     @staticmethod
     def delete_column(index_name):

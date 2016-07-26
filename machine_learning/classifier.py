@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.externals import joblib
 from sklearn.linear_model import LogisticRegression
 
 from semantic_labeling import features, DEBUG
@@ -18,6 +19,8 @@ class Classifier(object):
             train_data += data
         train_data = pd.DataFrame(train_data)
         train_data = train_data.replace([np.inf, -np.inf, np.nan], 0)
+        train_data.to_csv("train.csv", mode='w', header=True)
+
         self.model.fit(train_data[features], train_data["target"])
         if DEBUG:
             self.debug()
@@ -27,6 +30,12 @@ class Classifier(object):
         test_df = test_df.replace([np.inf, -np.inf, np.nan], 0)
         test_df['prob'] = [x[1] for x in self.model.predict_proba(test_df[features])]
         return test_df
+
+    def save(self):
+        joblib.dump(self.model, type(self).__name__ + ".pkl")
+
+    def load(self, file_path):
+        self.model = joblib.load(file_path)
 
     def debug(self):
         pass
