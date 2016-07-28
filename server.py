@@ -4,7 +4,6 @@ from flask_cors import CORS
 from flask_restful import Api, Resource
 from flask_restful_swagger import swagger
 
-import config
 import service.serverLogic
 
 
@@ -229,7 +228,7 @@ class Predict(Resource):
             parameters.namespaces(),
             parameters.column_names(False, "Name of the column the data may belong to", False),
             parameters.models(False, "The model the data may belong to", False),
-            parameters.source_names(False, "Source the data may belong to", False),
+            parameters.source_names(False, "Sources the data may belong to", True),
             parameters.body(True, "List of data values to predict")
         ],
         responseMessages=responses.standard_get()
@@ -241,7 +240,7 @@ class Predict(Resource):
         <pre>
         [
             {
-                "id": "",
+                "type_id": "",
                 "score":
             }
         ]
@@ -660,4 +659,4 @@ api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
 api.add_resource(SemanticTypeColumnData, '/semantic_types/type/<string:column_id>')
 api.add_resource(BulkAddModels, '/bulk_add_models')
 api.add_resource(BulkAddModelData, '/bulk_add_models/<string:model_id>')
-app.run(debug=True, port=config.PORT, use_reloader=False)
+app.run(debug=True, port=5000, use_reloader=False)

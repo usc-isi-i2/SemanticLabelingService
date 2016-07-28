@@ -188,10 +188,10 @@ class Entity:
 
 
 class Attribute:
-    def __init__(self, name, source_name):
+    def __init__(self, name, source_name, semantic_type=None):
         self.name = name
         self.source_name = source_name
-        self.semantic_type = None
+        self.semantic_type = semantic_type
 
         self.text = ""
 
@@ -248,7 +248,7 @@ class Attribute:
         feature_vectors = compute_feature_vectors(labeled_attrs_map, self.to_json(), tf_idf_map)
         return feature_vectors
 
-    def predict_type(self, index_name, labeled_sources, labeled_attrs_map, classifier):
+    def predict_type(self, index_name, labeled_sources, labeled_attrs_map, classifier, confidence_threshold=0.2):
         feature_vectors = self.compute_features(index_name, labeled_sources, labeled_attrs_map)
         predictions = classifier.predict(feature_vectors)
 
@@ -266,7 +266,7 @@ class Attribute:
         predictions = sorted(predictions, key=lambda x: x["prob"], reverse=True)
 
         for prediction in predictions:
-            if prediction["semantic_type"] in semantic_type_set or prediction["prob"] < 0.5:
+            if prediction["semantic_type"] in semantic_type_set or prediction["prob"] < confidence_threshold:
                 predictions.remove(prediction)
             else:
                 semantic_type_set.add(prediction["semantic_type"])

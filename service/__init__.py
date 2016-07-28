@@ -5,8 +5,11 @@ from flask import Response
 
 
 ######## General Constants #########
-NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'  # Characters not allowed by elastic search
-ID_DIVIDER        = "-"                # The divider that is used to separate the different parts of ID's, like class and property
+DATA_MODEL_PATH   = "model/Regression.pkl"  # File path for the model used by the semantic labeling
+INDEX_NAME        = "index_name"            # The index_name for use when saving attributes
+NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'       # Characters not allowed by elastic search
+ID_DIVIDER        = "-"                     # The divider that is used to separate the different parts of ID's, like class and property
+CONFIDENCE        = 0.2                     # Semantic types which have a confidence of lower than this number on predict will not be returned
 
 ######## Mongodb Names ########
 ID                      = "_id"          # ID for any entry in the db
@@ -48,6 +51,9 @@ MODEL_DESC  = "modelDesc"
 MODEL_IDS   = "modelIds"
 MODEL_ID    = "modelId"
 
+######## Other return names ########
+SCORE = "score"
+
 
 def json_response(json_body, code):
     return Response(response=str(json.dumps(json_body, ensure_ascii=False, indent=4)), status=code, mimetype="application/json")
@@ -74,3 +80,12 @@ def clean_column_output(column, show_data=True):
 
 def clean_columns_output(column_input, show_data):
     return map(lambda t: clean_column_output(t, show_data), column_input)
+
+
+def get_column_create_db_body(column_id, type_id, column_name, source_name, model):
+    return {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model}
+
+
+def get_type_from_column_id(type_id):
+    split_type_id = type_id.split(ID_DIVIDER)
+    return split_type_id[0] + ID_DIVIDER + split_type_id[1]

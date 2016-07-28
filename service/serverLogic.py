@@ -1,12 +1,17 @@
 import validators
 from pymongo import MongoClient
 
+from data_source.data_source import Attribute
+from machine_learning.classifier import Classifier
+from search_engine.searcher import Searcher
 from service import *
 
 
 class Server(object):
     def __init__(self):
         self.db = MongoClient().data.posts
+        self.classifier = Classifier(None)
+        self.classifier.load(DATA_MODEL_PATH)
 
 
     ################ Stuff for use in this file ################
@@ -17,8 +22,7 @@ class Server(object):
 
         # Verify that class is a valid uri and namespace is a valid uri
         namespace = "/".join(class_.split("/")[:-1])
-        if not validators.url(class_) or not validators.url(namespace):
-            return "Invalid class URI was given", 400
+        if not validators.url(class_) or not validators.url(namespace): return "Invalid class URI was given", 400
 
         # Actually add the type
         type_id = get_type_id(class_, property_)
@@ -35,12 +39,13 @@ class Server(object):
 
     def _create_column(self, type_id, column_name, source_name, model, data=[], force=False):
         column_id = get_column_id(type_id, column_name, source_name, model)
-        db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model, DATA: data}
+        db_body = get_column_create_db_body(column_id, type_id, column_name, source_name, model)
         if force:
             self.db.delete_many(db_body)
         else:
             if self.db.find_one(db_body):
                 return "Column already exists", 409
+        db_body[DATA] = data
         self.db.insert_one(db_body)
         return column_id, 201
 
@@ -56,18 +61,34 @@ class Server(object):
 
     def predict_post(self, args, body):
         #### Assert args and body are valid
-        if body is None or body == "":
-            return "Invalid message body", 400
+        if body is None or body == "": return "Invalid message body", 400
         args = args.copy()
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
         col_name = args.pop(COLUMN_NAME, None)
         model = args.pop(MODEL, None)
-        source_col = args.pop(SOURCE_NAME, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if col_name is None: col_name = "default"
+        if source_names is None:
+            source_names = set()
+            for col in self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}):
+                source_names.add(col[SOURCE_NAME])
+            source_names = list(source_names)
 
         #### Predict the types
-        return "Method partially implemented", 601
+        att = Attribute(col_name, source_names[0])
+        for value in body.split("\n"):
+            att.add_value(value)
+        prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
+        if len(prediction) < 1: return "No matches found", 404
+
+        return_body = []
+        for t in prediction:
+            o = collections.OrderedDict()
+            o[TYPE_ID] = t["semantic_type"]
+            o[SCORE] = t["prob"]
+            return_body.append(o)
+        return json_response(return_body, 200)
 
 
     ################ SemanticTypes ################
@@ -84,8 +105,7 @@ class Server(object):
         models = args.pop(MODELS).split(",") if args.get(MODELS) else None
         return_columns = args.pop(RETURN_COLUMNS, None)
         return_column_data = args.pop(RETURN_COLUMN_DATA, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
         return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
 
@@ -139,10 +159,8 @@ class Server(object):
         args = args.copy()
         class_ = args.pop(CLASS, None)
         property_ = args.pop(PROPERTY, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if class_ is None or property_ is None:
-            return "Both 'class' and 'property' must be specified", 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
 
         #### Add the type
         return self._create_semantic_type(class_, property_)
@@ -153,10 +171,8 @@ class Server(object):
         args = args.copy()
         class_ = args.pop(CLASS, None)
         property_ = args.pop(PROPERTY, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if class_ is None or property_ is None:
-            return "Both 'class' and 'property' must be specified", 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
 
         #### Add the type
         return self._create_semantic_type(class_, property_, True)
@@ -164,6 +180,7 @@ class Server(object):
 
     def semantic_types_delete(self, args):
         #### Assert args are valid
+        if len(args) < 1: return "At least one argument needs to be provided", 400
         args = args.copy()
         class_ = args.pop(CLASS, None)
         property_ = args.pop(PROPERTY, None)
@@ -173,8 +190,7 @@ class Server(object):
         column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
         models = args.pop(MODELS).split(",") if args.get(MODELS) else None
         delete_all = args.pop(DELETE_ALL, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
 
         #### Delete the types
         if delete_all and delete_all.lower() == "true":
@@ -197,8 +213,7 @@ class Server(object):
         if class_ is not None: db_body[CLASS] = class_
         if property_ is not None: db_body[PROPERTY] = property_
         if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
-        if source_names is None and column_names is None and column_ids is None and models is None:
-            deleted = self.db.delete_many(db_body).deleted_count
+        if source_names is None and column_names is None and column_ids is None and models is None: deleted = self.db.delete_many(db_body).deleted_count
         else:
             for t in self.db.find(db_body):
                 if t[ID] not in possible_types:
@@ -206,26 +221,28 @@ class Server(object):
             for id_ in type_ids_to_delete:
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
-            deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}).deleted_count
-            self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}})
+            db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}
+            found_columns = list(self.db.find(db_body))
+            for col in found_columns:
+                Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+            self.db.delete_many(db_body)
+            deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
 
-        return deleted + " semantic types matched parameters and were deleted", 200
+        return str(deleted) + " semantic types matched parameters and were deleted", 200
 
 
     ################ SemanticTypesColumns ################
 
     def semantic_types_columns_get(self, type_id, args):
         #### Assert args are valid
-        if type_id is None or len(type_id) < 1:
-            return "Invalid type_id", 400
+        if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
         args = args.copy()
         column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
         source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
         column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
         models = args.pop(MODELS).split(",") if args.get(MODELS) else None
         return_column_data = args.pop(RETURN_COLUMN_DATA, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
 
         #### Get the columns
@@ -241,53 +258,59 @@ class Server(object):
 
     def semantic_types_columns_post(self, type_id, args, body):
         #### Assert args are valid
-        if type_id is None or len(type_id) < 1:
-            return "Invalid type_id", 400
+        if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
         args = args.copy()
         column_name = args.pop(COLUMN_NAME, None)
         source_name = args.pop(SOURCE_NAME, None)
         model = args.pop(MODEL, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_name is None or source_name is None:
-            return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
-        if model is None:
-            model = "default"
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+        if model is None: model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
+        body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
+        if body_useful: body = body.split("\n")
+        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [])
+        if result[1] == 201 and body_useful:
+            att = Attribute(column_name, source_name, type_id)
+            for value in body:
+                att.add_value(value)
+            att.save(INDEX_NAME)
+        return result
 
 
     def semantic_types_columns_put(self, type_id, args, body):
         #### Assert args are valid
-        if type_id is None or len(type_id) < 1:
-            return "Invalid type_id", 400
+        if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
         args = args.copy()
         column_name = args.pop(COLUMN_NAME, None)
         source_name = args.pop(SOURCE_NAME, None)
         model = args.pop(MODEL, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_name is None or source_name is None:
-            return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
-        if model is None:
-            model = "default"
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+        if model is None: model = "default"
 
-        #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
+        #### Add/Replace the column
+        body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
+        if body_useful: body = body.split("\n")
+        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [], True)
+        if result[1] == 201 and body_useful:
+            att = Attribute(column_name, source_name, type_id)
+            for value in body:
+                att.add_value(value)
+            att.update(INDEX_NAME)
+        return result
 
 
     def semantic_types_columns_delete(self, type_id, args):
         #### Assert args are valid
-        if type_id is None or len(type_id) < 1:
-            return "Invalid type_id", 400
+        if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
         args = args.copy()
         column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
         source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
         column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
         models = args.pop(MODELS).split(",") if args.get(MODELS) else None
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
 
         #### Delete the columns
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
@@ -295,20 +318,22 @@ class Server(object):
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        deleted_count = self.db.delete_many(db_body).deleted_count
+        found_columns = list(self.db.find(db_body))
+        if len(found_columns) < 1: return "No columns were found with the given parameters", 404
+        for col in found_columns:
+            Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+        self.db.delete_many(db_body)
 
-        if deleted_count < 1: return "No columns were found with the given parameters", 404
-        return str(deleted_count) + " columns deleted successfully", 200
+        # FIXME: this is returning incorrect number of types deleted
+        return str(len(found_columns)) + " columns deleted successfully", 200
 
 
     ################ SemanticTypesColumnData ################
 
     def semantic_types_column_data_get(self, column_id, args):
         #### Assert args are valid
-        if column_id is None or len(column_id) < 1:
-            return "Invalid column_id", 400
-        if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
+        if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+        if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Get the column
         result = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}))
@@ -319,41 +344,52 @@ class Server(object):
 
     def semantic_types_column_data_post(self, column_id, args, body):
         #### Assert args are valid
-        if body is None or body == "":
-            return "Invalid message body", 400
-        if column_id is None or len(column_id) < 1:
-            return "Invalid column_id", 400
-        if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
+        if body is None or body == "": return "Invalid message body", 400
+        if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+        if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Add the data
-        return self._add_data_to_column(column_id, body.split("\n"))
+        values = body.split("\n")
+        result = self._add_data_to_column(column_id, values)
+
+        if result[1] == 201:
+            column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
+            for value in values:
+                att.add_value(value)
+            att.update(INDEX_NAME)
+        return result
 
 
     def semantic_types_column_data_put(self, column_id, args, body):
         #### Assert args are valid
-        if body is None or body == "":
-            return "Invalid message body", 400
-        if column_id is None or len(column_id) < 1:
-            return "Invalid column_id", 400
-        if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
+        if body is None or body == "": return "Invalid message body", 400
+        if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+        if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Replace the data
-        return self._add_data_to_column(column_id, body.split("\n"), True)
+        values = body.split("\n")
+        result = self._add_data_to_column(column_id, values, True)
+        if result[1] == 201:
+            column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
+            for value in values:
+                att.add_value(value)
+            att.save(INDEX_NAME)
+        return result
 
 
     def semantic_types_column_data_delete(self, column_id, args):
         #### Assert args are valid
-        if column_id is None or len(column_id) < 1:
-            return "Invalid column_id", 400
-        if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
+        if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+        if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Delete the data
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set": {DATA: []}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
+        column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+        Attribute(column[COLUMN_NAME], column[SOURCE_NAME]).delete(INDEX_NAME)
         return "Column data deleted", 200
 
 
@@ -366,8 +402,7 @@ class Server(object):
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
         show_all = args.pop(SHOW_ALL, None)
-        if len(args) > 0:
-            return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
+        if len(args) > 0: return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
         show_all = True if show_all is not None and show_all.lower() == "true" else False
 
         #### Find the model
@@ -394,11 +429,9 @@ class Server(object):
 
     def bulk_add_models_post(self, args, body):
         #### Assert args are valid
-        if body is None or len(body) < 1:
-            return "Invalid message body", 400
+        if body is None or len(body) < 1: return "Invalid message body", 400
         column_model = args.pop(MODEL, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_model is None: column_model = "bulk_add"
 
         #### Assert the required elements exist
@@ -445,8 +478,7 @@ class Server(object):
         model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
 
         #### Delete the model
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
@@ -463,10 +495,8 @@ class Server(object):
     ################ BulkAddModelData ################
 
     def bulk_add_model_data_get(self, model_id, args):
-        if model_id is None or len(model_id) < 1:
-            return "Invalid model_id", 400
-        if len(args) > 0:
-            return "Invalid arguments, there should be none", 400
+        if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
+        if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Get the model
         db_result = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
@@ -478,15 +508,13 @@ class Server(object):
 
 
     def bulk_add_model_data_post(self, model_id, args, body):
-        if model_id is None or len(model_id) < 1:
-            return "Invalid model_id", 400
-        if body is None or len(body) < 1:
-            return "Invalid message body", 400
+        if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
+        if body is None or len(body) < 1: return "Invalid message body", 400
         column_model = args.pop(MODEL, None)
-        if len(args) > 0:
-            return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_model is None: column_model = "bulk_add"
 
+        # TODO: Add semantic labeling
         #### Process the data
         # Get the model and parse the json lines
         model = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
