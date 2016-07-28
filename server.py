@@ -4,7 +4,6 @@ from flask_cors import CORS
 from flask_restful import Api, Resource
 from flask_restful_swagger import swagger
 
-import config
 import service.serverLogic
 
 
@@ -660,4 +659,4 @@ api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
 api.add_resource(SemanticTypeColumnData, '/semantic_types/type/<string:column_id>')
 api.add_resource(BulkAddModels, '/bulk_add_models')
 api.add_resource(BulkAddModelData, '/bulk_add_models/<string:model_id>')
-app.run(debug=True, port=config.PORT, use_reloader=False)
+app.run(debug=True, port=5000, use_reloader=False)
