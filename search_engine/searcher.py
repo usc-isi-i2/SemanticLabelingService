@@ -12,18 +12,19 @@ class Searcher:
     def search_columns_data(index_name, source_names):
         # result = list(scan(es, index=index_name, doc_type=','.join(source_names),
         #                    query={"query": {"match_all": {}}}))
-        result = list(data_collection.find({"set_name": index_name, "source_name": {"$in": source_names}}))
+        result = list(data_collection.find({"set_name": index_name, "source_name": {"$in": source_names}}, {"_id": 0}))
         return result
 
     @staticmethod
     def search_column_data_by_name(column_name, index_name, source_name):
         result = data_collection.find_one(
-            {"set_name": index_name, "source_name": source_name, "name": column_name, "value_list": {"$exists": True}})
+            {"set_name": index_name, "source_name": source_name, "name": column_name, "value_list": {"$exists": True}},
+            {"_id": 0})
         return result
 
     @staticmethod
     def search_relations_data(type1, type2, relation):
-        result = relation_collection.find_one({"type1": type1, "type2": type2, "relation": relation})
+        result = relation_collection.find_one({"type1": type1, "type2": type2, "relation": relation}, {"_id": 0})
         return result
 
     @staticmethod

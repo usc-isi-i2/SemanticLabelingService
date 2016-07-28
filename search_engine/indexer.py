@@ -1,3 +1,5 @@
+from elasticsearch.helpers import scan, bulk
+
 from search_engine import es
 from semantic_labeling import data_collection, relation_collection, TF_TEXT
 
@@ -25,7 +27,6 @@ class Indexer:
                 es.index(index=index_name, doc_type=source_name, body=obj)
             else:
                 data_collection.insert_one(obj)
-                # es.index(index=index_name, doc_type=source_name, body=obj)
 
     @staticmethod
     def index_relation(relation, type1, type2, flag):
@@ -39,4 +40,9 @@ class Indexer:
     @staticmethod
     def delete_column(column_name, source_name, index_name):
         data_collection.delete_many({"name": column_name, "source_name": source_name, "set_name": index_name})
-        es.delete_by_query(index_name, {"name": column_name}, source_name)
+        bulk_deletes = []
+        for result in scan(es, query={"name": column_name}, index=index_name, doc_type=source_name, _source=False,
+                           track_scores=False, scroll='5m'):
+            result['_op_type'] = 'delete'
+            bulk_deletes.append(result)
+        bulk(es, bulk_deletes)

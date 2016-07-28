@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.externals import joblib
 from sklearn.linear_model import LogisticRegression
+import os
 
 from semantic_labeling import features, DEBUG
 
@@ -31,8 +32,8 @@ class Classifier(object):
         test_df['prob'] = [x[1] for x in self.model.predict_proba(test_df[features])]
         return test_df
 
-    def save(self):
-        joblib.dump(self.model, type(self).__name__ + ".pkl")
+    def save(self, file_path):
+        joblib.dump(self.model, os.path.join(file_path, type(self).__name__ + ".pkl"))
 
     def load(self, file_path):
         self.model = joblib.load(file_path)
