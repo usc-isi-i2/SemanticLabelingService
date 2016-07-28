@@ -6,7 +6,12 @@ def greater(list1, list2):
     else:
         list2 = list2[:len(list1)]
     for idx in range(len(list1)):
-        if list1[idx] < list2[idx]:
+        try:
+            val1 = float(list1[idx])
+            val2 = float(list2[idx])
+            if val1 < val2:
+                return False
+        except:
             return False
     return True
 
@@ -19,7 +24,12 @@ def less(list1, list2):
     else:
         list2 = list2[:len(list1)]
     for idx in range(len(list1)):
-        if list1[idx] > list2[idx]:
+        try:
+            val1 = float(list1[idx])
+            val2 = float(list2[idx])
+            if val1 > val2:
+                return False
+        except:
             return False
     return True
 
@@ -32,7 +42,12 @@ def equal(list1, list2):
     else:
         list2 = list2[:len(list1)]
     for idx in range(len(list1)):
-        if list1[idx] != list2[idx]:
+        try:
+            val1 = float(list1[idx])
+            val2 = float(list2[idx])
+            if val1 != val2:
+                return False
+        except:
             return False
     return True
 
