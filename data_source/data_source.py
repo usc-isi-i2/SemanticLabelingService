@@ -51,19 +51,20 @@ class DataSet:
                 source = self.source_map[key]
                 labeled_sources, labeled_attrs_map = self.get_labeled_sources(idx, size)
                 print key, labeled_sources
-                for attr in source.attr_map.values():
-                    if attr.semantic_type and attr.value_list:
-                        predictions = attr.predict_type(self.name, labeled_sources, labeled_attrs_map, classifier)
-                        rank = 0
-                        count += 1
-                        for prediction in predictions:
-                            rank += 1
-                            debug_writer.write(source.name + "\t" +
-                                               attr.name + "\t" + attr.semantic_type + "\t" + str(prediction) + "\n")
-                            if prediction["semantic_type"] == attr.semantic_type:
-                                break
-                        score += 1.0 / rank
-                        debug_writer.write(str(score) + "\n")
+                prediction_map = source.label(labeled_attrs_map, classifier, labeled_sources)
+                prediction_map = source.align_semantic_types(prediction_map)
+                for attr_name in prediction_map:
+                    attr = source.column_map[attr_name]
+                    rank = 0
+                    count += 1
+                    for obj in prediction_map[attr_name]:
+                        rank += 1
+                        debug_writer.write(source.name + "\t" +
+                                           attr.name + "\t" + attr.semantic_type + "\t" + str(prediction) + "\n")
+                        if obj["semantic_type"] == attr.semantic_type:
+                            break
+                    score += 1.0 / rank
+                    debug_writer.write(str(score) + "\n")
             mrr_scores[size] = score * 1.0 / count
         return mrr_scores
 
@@ -134,7 +135,7 @@ class DataSource:
         self.learn_relation(True)
         for attr in self.attr_map.values():
             if attr.semantic_type and attr.value_list:
-                attr.save(self.name, index_name)
+                attr.save(index_name)
 
     def label(self, labeled_attrs_map, classifier, labeled_sources):
         result = {}
@@ -145,7 +146,7 @@ class DataSource:
                 result[attr.name] = prediction
         return result
 
-    def align_semantic_type(self, prediction_map):
+    def align_semantic_types(self, prediction_map):
         prediction_map = sorted(prediction_map, key=lambda x: (-len(x), x[0]["prob"] - x[1]["prob"], x[0]["prob"]),
                                 reverse=True)
 
@@ -156,14 +157,14 @@ class DataSource:
                 for idx2, obj2 in enumerate(prediction_map[key[1]]):
                     relation_score = Searcher.get_relation_score(obj1["semantic_type"], obj2["semantic_type"],
                                                                  relation_map[key])
-                    prediction_map[key[0]][idx1]["prob"] += relation_score
-                    prediction_map[key[1]][idx2]["prob"] += relation_score
+                    prediction_map[key[0]][idx1]["prob"] += (relation_score - 0.5)
+                    prediction_map[key[1]][idx2]["prob"] += (relation_score - 0.5)
         return prediction_map
 
     def learn_relation(self, is_saving=False):
         relation_map = {}
-        for attr1 in self.attr_map.values():
-            for attr2 in self.attr_map.values():
+        for idx, attr1 in enumerate(self.attr_map.values()):
+            for attr2 in self.attr_map.values()[idx + 1:]:
                 for test in relation_test_map.keys():
                     if relation_test_map[test](attr1.value_list, attr2.value_list):
                         flag = True

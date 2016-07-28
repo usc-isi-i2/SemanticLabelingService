@@ -17,6 +17,7 @@ class SemanticLabeler:
             self.classifier = RandomForest(classifier_training_sets)
         self.classifier.train(self.data_set_map)
         self.classifier.debug()
+        self.classifier.save("learned_models")
 
     def store_data_sets(self, set_names):
         for name in set_names:
@@ -40,9 +41,9 @@ class SemanticLabeler:
 
 if __name__ == "__main__":
     labeler = SemanticLabeler("LOGISTIC")
-    labeler.store_data_sets(["soccer2", "weather2"])
+    labeler.store_data_sets([ "weather2"])
     # sizes = random.sample(range([1, 2, 3, 4, 5]), 2)
-    labeler.train_classifier({"soccer2": [1]})
-    labeler.test_semantic_typing1(
-        {"weather2": [1]})
+    # labeler.train_classifier({"soccer2": [1]})
+    # labeler.test_semantic_typing1(
+    #     {"weather2": [1]})
     # , "museum2": [1, 2, 3, 4, 5, 14], "weather_old2": [1, 2, 3], "soccer2": [1, 2, 3, 4, 5]
