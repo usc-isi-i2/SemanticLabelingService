@@ -9,6 +9,7 @@ DATA_MODEL_PATH   = "model/Regression.pkl"  # File path for the model used by th
 INDEX_NAME        = "index_name"            # The index_name for use when saving attributes
 NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'       # Characters not allowed by elastic search
 ID_DIVIDER        = "-"                     # The divider that is used to separate the different parts of ID's, like class and property
+CONFIDENCE        = 0.2                     # Semantic types which have a confidence of lower than this number on predict will not be returned
 
 ######## Mongodb Names ########
 ID                      = "_id"          # ID for any entry in the db

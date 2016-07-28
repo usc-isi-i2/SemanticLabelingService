@@ -3,6 +3,7 @@ from pymongo import MongoClient
 
 from data_source.data_source import Attribute
 from machine_learning.classifier import Classifier
+from search_engine.searcher import Searcher
 from service import *
 
 
@@ -65,12 +66,23 @@ class Server(object):
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
         col_name = args.pop(COLUMN_NAME, None)
         model = args.pop(MODEL, None)
-        source_col = args.pop(SOURCE_NAME, None)
+        source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+        if col_name is None: col_name = "default"
+        if source_names is None:
+            source_names = set()
+            for col in self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}):
+                source_names.add(col[SOURCE_NAME])
+            source_names = list(source_names)
 
         #### Predict the types
-        # TODO: use Attribute.predict_type() here
-        return "Method partially implemented", 601
+        att = Attribute(col_name, source_names[0])
+        for value in body.split("\n"):
+            att.add_value(value)
+        prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
+        if len(prediction) < 1: return "No matches found", 404
+        # TODO: Finish output format
+        return prediction, 200
 
 
     ################ SemanticTypes ################

@@ -228,7 +228,7 @@ class Predict(Resource):
             parameters.namespaces(),
             parameters.column_names(False, "Name of the column the data may belong to", False),
             parameters.models(False, "The model the data may belong to", False),
-            parameters.source_names(False, "Source the data may belong to", False),
+            parameters.source_names(False, "Sources the data may belong to", True),
             parameters.body(True, "List of data values to predict")
         ],
         responseMessages=responses.standard_get()
