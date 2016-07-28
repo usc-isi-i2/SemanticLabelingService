@@ -240,7 +240,7 @@ class Predict(Resource):
         <pre>
         [
             {
-                "id": "",
+                "type_id": "",
                 "score":
             }
         ]

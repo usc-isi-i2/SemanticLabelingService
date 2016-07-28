@@ -81,8 +81,14 @@ class Server(object):
             att.add_value(value)
         prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
         if len(prediction) < 1: return "No matches found", 404
-        # TODO: Finish output format
-        return prediction, 200
+
+        return_body = []
+        for t in prediction:
+            o = collections.OrderedDict()
+            o[TYPE_ID] = t["semantic_type"]
+            o[SCORE] = t["prob"]
+            return_body.append(o)
+        return json_response(return_body, 200)
 
 
     ################ SemanticTypes ################
@@ -266,7 +272,7 @@ class Server(object):
         if body_useful: body = body.split("\n")
         result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [])
         if result[1] == 201 and body_useful:
-            att = Attribute(column_name, source_name)
+            att = Attribute(column_name, source_name, type_id)
             for value in body:
                 att.add_value(value)
             att.save(INDEX_NAME)
@@ -289,7 +295,7 @@ class Server(object):
         if body_useful: body = body.split("\n")
         result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [], True)
         if result[1] == 201 and body_useful:
-            att = Attribute(column_name, source_name)
+            att = Attribute(column_name, source_name, type_id)
             for value in body:
                 att.add_value(value)
             att.update(INDEX_NAME)
@@ -318,6 +324,7 @@ class Server(object):
             Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
         self.db.delete_many(db_body)
 
+        # FIXME: this is returning incorrect number of types deleted
         return str(len(found_columns)) + " columns deleted successfully", 200
 
 
@@ -347,7 +354,7 @@ class Server(object):
 
         if result[1] == 201:
             column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME])
+            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
             for value in values:
                 att.add_value(value)
             att.update(INDEX_NAME)
@@ -365,7 +372,7 @@ class Server(object):
         result = self._add_data_to_column(column_id, values, True)
         if result[1] == 201:
             column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME])
+            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
             for value in values:
                 att.add_value(value)
             att.save(INDEX_NAME)
