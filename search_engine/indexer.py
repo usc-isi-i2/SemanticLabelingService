@@ -30,7 +30,6 @@ class Indexer:
 
     @staticmethod
     def index_relation(relation, type1, type2, flag):
-        print type1, type2, relation
         query = {"type1": type1, "type2": type2, "relation": relation, "true_count": {"$exists": True}}
         relation_collection.find_and_modify(query, {"$inc": {"true_count": 1 if flag else 0, "total_count": 1}},
                                             upsert=True)
@@ -42,7 +41,13 @@ class Indexer:
     def delete_column(column_name, source_name, index_name):
         data_collection.delete_many({"name": column_name, "source_name": source_name, "set_name": index_name})
         bulk_deletes = []
-        for result in scan(es, query={"name": column_name}, index=index_name, doc_type=source_name, _source=False,
+        for result in scan(es, query={
+            "query": {
+                "match": {
+                    "name": column_name,
+                }
+            }
+        }, index=index_name, doc_type=source_name, _source=False,
                            track_scores=False, scroll='5m'):
             result['_op_type'] = 'delete'
             bulk_deletes.append(result)
