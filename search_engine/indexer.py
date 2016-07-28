@@ -30,6 +30,7 @@ class Indexer:
 
     @staticmethod
     def index_relation(relation, type1, type2, flag):
+        print type1, type2, relation
         query = {"type1": type1, "type2": type2, "relation": relation, "true_count": {"$exists": True}}
         relation_collection.find_and_modify(query, {"$inc": {"true_count": 1 if flag else 0, "total_count": 1}},
                                             upsert=True)

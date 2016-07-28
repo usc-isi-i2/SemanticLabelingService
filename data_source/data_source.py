@@ -277,10 +277,12 @@ class Attribute:
         Indexer.index_column(self, self.source_name, index_name)
 
     def update(self, index_name):
-        value_list = Searcher.search_column_data_by_name(self.name, self.source_name, index_name)["value_list"]
-        for value in value_list:
-            self.add_value(value)
-        Indexer.delete_column(self.name, self.source_name, index_name)
+        result = Searcher.search_column_data_by_name(self.name, self.source_name, index_name)
+        if result:
+            value_list = result["value_list"]
+            for value in value_list:
+                self.add_value(value)
+            Indexer.delete_column(self.name, self.source_name, index_name)
         Indexer.index_column(self, self.source_name, index_name)
 
     def delete(self, index_name):
