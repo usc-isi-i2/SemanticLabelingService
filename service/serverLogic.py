@@ -203,8 +203,11 @@ class Server(object):
             for id_ in type_ids_to_delete:
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
-            # TODO: Also delete the stuff in es
-            self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}})
+            db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}
+            found_columns = list(self.db.find(db_body))
+            for col in found_columns:
+                Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+            self.db.delete_many(db_body)
             deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
 
         return str(deleted) + " semantic types matched parameters and were deleted", 200
@@ -292,16 +295,18 @@ class Server(object):
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
 
         #### Delete the columns
-        # TODO: Also delete the stuff in es
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        deleted_count = self.db.delete_many(db_body).deleted_count
+        found_columns = list(self.db.find(db_body))
+        if len(found_columns) < 1: return "No columns were found with the given parameters", 404
+        for col in found_columns:
+            Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+        self.db.delete_many(db_body)
 
-        if deleted_count < 1: return "No columns were found with the given parameters", 404
-        return str(deleted_count) + " columns deleted successfully", 200
+        return str(len(found_columns)) + " columns deleted successfully", 200
 
 
     ################ SemanticTypesColumnData ################
