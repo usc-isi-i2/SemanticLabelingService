@@ -54,6 +54,13 @@ class Server(object):
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if replace else "$pushAll": {DATA: body}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
+
+        column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+        att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
+        for value in body:
+            att.add_value(value)
+        att.update(INDEX_NAME)
+
         return "Column data updated", 201
 
 
@@ -64,11 +71,11 @@ class Server(object):
         if body is None or body == "": return "Invalid message body", 400
         args = args.copy()
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
-        col_name = args.pop(COLUMN_NAME, None)
-        model = args.pop(MODEL, None)
+        column_names = args.pop(COLUMN_NAME).split(",") if args.get(COLUMN_NAME) else None
         source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+        models = args.pop(MODEL).split(",") if args.get(MODEL) else None
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if col_name is None: col_name = "default"
+        if column_names is None: column_names = ["default"]
         if source_names is None:
             source_names = set()
             for col in self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}):
@@ -76,14 +83,33 @@ class Server(object):
             source_names = list(source_names)
 
         #### Predict the types
-        att = Attribute(col_name, source_names[0])
+        att = Attribute(column_names[0], source_names[0])
         for value in body.split("\n"):
             att.add_value(value)
         prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
         if len(prediction) < 1: return "No matches found", 404
 
+        allowed_ids_namespaces = None
+        allowed_ids_models = None
+        all_allowed_ids = None
+        if namespaces is not None:
+            allowed_ids_namespaces = set()
+            current_allowed_types = list(self.db.find({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, NAMESPACE: {"$in": namespaces}}))
+            for t in current_allowed_types:
+                allowed_ids_namespaces.add(t[ID])
+        if models:
+            allowed_ids_models = set()
+            current_allowed_types = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, MODEL: {"$in": models}}))
+            for c in current_allowed_types:
+                allowed_ids_models.add(c[TYPEID])
+        if allowed_ids_namespaces is not None and allowed_ids_models is not None: all_allowed_ids = allowed_ids_namespaces & allowed_ids_models
+        elif allowed_ids_namespaces is not None and allowed_ids_models is None: all_allowed_ids = allowed_ids_namespaces
+        elif allowed_ids_namespaces is None and allowed_ids_models is not None: all_allowed_ids = allowed_ids_models
         return_body = []
         for t in prediction:
+            if all_allowed_ids is not None:
+                if t["semantic_type"] not in all_allowed_ids:
+                    continue
             o = collections.OrderedDict()
             o[TYPE_ID] = t["semantic_type"]
             o[SCORE] = t["prob"]
@@ -349,16 +375,7 @@ class Server(object):
         if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Add the data
-        values = body.split("\n")
-        result = self._add_data_to_column(column_id, values)
-
-        if result[1] == 201:
-            column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
-            for value in values:
-                att.add_value(value)
-            att.update(INDEX_NAME)
-        return result
+        return self._add_data_to_column(column_id, body.split("\n"))
 
 
     def semantic_types_column_data_put(self, column_id, args, body):
@@ -514,7 +531,6 @@ class Server(object):
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_model is None: column_model = "bulk_add"
 
-        # TODO: Add semantic labeling
         #### Process the data
         # Get the model and parse the json lines
         model = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
