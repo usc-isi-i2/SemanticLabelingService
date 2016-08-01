@@ -17,33 +17,66 @@ class Server(object):
     ################ Stuff for use in this file ################
 
     def _create_semantic_type(self, class_, property_, force=False):
+        """
+        Creates a semantic type and returns the id if it was successful.
+
+        Notes: If the type already exists and force is not set to true a 409 will be returned and no data will be modified
+
+        :param class_:    The class of the semantic type, note that this must be a valid URL
+        :param property_: The property of the semantic type
+        :param force:     Force create the semantic type, if this is true and the type already exists the existing type (and all of its columns and data) will be deleted before creation
+        :return: The id of the new semantic type and a response code of 201 if the creation was successful, otherwise it will be an error message with the appropriate error code
+        """
+
         class_ = class_.rstrip("/")
         property_ = property_.rstrip("/")
 
-        # Verify that class is a valid uri and namespace is a valid uri
+        ## Verify that class is a valid uri and namespace is a valid uri
         namespace = "/".join(class_.split("/")[:-1])
         if not validators.url(class_) or not validators.url(namespace): return "Invalid class URI was given", 400
 
-        # Actually add the type
+        ## Actually add the type
         type_id = get_type_id(class_, property_)
         db_body = {ID: type_id, DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, CLASS: class_, PROPERTY: property_, NAMESPACE: namespace}
-        if force:
-            self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id})
-            self.db.delete_many(db_body)
-        else:
-            if self.db.find_one(db_body):
+        if self.db.find_one(db_body):
+            if force:
+                # Remove the columns from the semantic labeler
+                found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
+                for col in found_columns:
+                    Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                # Remove the columns from the db
+                self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id})
+                self.db.delete_many(db_body)
+            else:
                 return "Semantic type already exists", 409
         self.db.insert_one(db_body)
         return type_id, 201
 
 
     def _create_column(self, type_id, column_name, source_name, model, data=[], force=False):
+        """
+        Create a column in a semantic type and return the column's id if it was created successfully.
+
+        Notes: If the column already exists and force is not set to true, a 409 will be returned and no data will be modified.
+
+        :param type_id:     Id of the semantic type this column belongs to
+        :param column_name: Name of the column to be created
+        :param source_name: Name of the source of the column to be created
+        :param model:       Model of the column to be created
+        :param data:        Data which will be added to the column on creation
+        :param force:       Force create the column, if this is true and the column exists the old column will be deleted (with all of its data) before creation
+        :return: The id of the new column and a response code of 201 if the creation was successful, otherwise it will be an error message with the appropriate error code
+        """
+
         column_id = get_column_id(type_id, column_name, source_name, model)
-        db_body = get_column_create_db_body(column_id, type_id, column_name, source_name, model)
-        if force:
-            self.db.delete_many(db_body)
-        else:
-            if self.db.find_one(db_body):
+        db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model}
+        if self.db.find_one(db_body):
+            if force:
+                found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
+                for col in found_columns:
+                    Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                self.db.delete_many(db_body)
+            else:
                 return "Column already exists", 409
         db_body[DATA] = data
         self.db.insert_one(db_body)
@@ -51,12 +84,24 @@ class Server(object):
 
 
     def _add_data_to_column(self, column_id, body, replace=False):
+        """
+        Add or replace data on an existing column
+
+        Notes: If the column does not exist a 404 will be returned
+
+        :param column_id: Id of the column to add/replace the data of
+        :param body:      An array of the new data
+        :param replace:   True if the current data in the column should be replaced, false if the new data should just be appended
+        :return: A conformation with a 201 if it was added successfully or an error message with an appropriate error code if it was not successful
+        """
+
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if replace else "$pushAll": {DATA: body}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
 
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
+        if replace: att.delete(INDEX_NAME)
         for value in body:
             att.add_value(value)
         att.update(INDEX_NAME)
@@ -77,18 +122,21 @@ class Server(object):
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_names is None: column_names = ["default"]
         if source_names is None:
+            # If no source names are given just use all of the source names in the db
             source_names = set()
             for col in self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}):
                 source_names.add(col[SOURCE_NAME])
             source_names = list(source_names)
 
         #### Predict the types
+        ## Do the actual predicting using the semantic labeler
         att = Attribute(column_names[0], source_names[0])
         for value in body.split("\n"):
             att.add_value(value)
         prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
         if len(prediction) < 1: return "No matches found", 404
 
+        ## Filter the results
         allowed_ids_namespaces = None
         allowed_ids_models = None
         all_allowed_ids = None
@@ -101,17 +149,18 @@ class Server(object):
             allowed_ids_models = set()
             current_allowed_types = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, MODEL: {"$in": models}}))
             for c in current_allowed_types:
-                allowed_ids_models.add(c[TYPEID])
+                allowed_ids_models.add(c[TYPE_ID])
         if allowed_ids_namespaces is not None and allowed_ids_models is not None: all_allowed_ids = allowed_ids_namespaces & allowed_ids_models
         elif allowed_ids_namespaces is not None and allowed_ids_models is None: all_allowed_ids = allowed_ids_namespaces
         elif allowed_ids_namespaces is None and allowed_ids_models is not None: all_allowed_ids = allowed_ids_models
         return_body = []
         for t in prediction:
+            # Construct the new return body
             if all_allowed_ids is not None:
                 if t["semantic_type"] not in all_allowed_ids:
                     continue
             o = collections.OrderedDict()
-            o[TYPE_ID] = t["semantic_type"]
+            o[TYPE_ID_PATH] = t["semantic_type"]
             o[SCORE] = t["prob"]
             return_body.append(o)
         return json_response(return_body, 200)
@@ -155,7 +204,7 @@ class Server(object):
             if models is not None: db_body[MODEL] = {"$in": models}
             other_possible_ids = set()
             for col in self.db.find(db_body):
-                other_possible_ids.add(col[TYPEID])
+                other_possible_ids.add(col[TYPE_ID])
             possible_type_ids = possible_type_ids & other_possible_ids
 
         # Construct the return body
@@ -163,7 +212,7 @@ class Server(object):
         for t in possible_result:
             if t[ID] in possible_type_ids:
                 o = collections.OrderedDict()
-                o[TYPE_ID] = t[ID]
+                o[TYPE_ID_PATH] = t[ID]
                 o[CLASS] = t[CLASS]
                 o[PROPERTY] = t[PROPERTY]
                 o[NAMESPACE] = t[NAMESPACE]
@@ -173,14 +222,14 @@ class Server(object):
         if return_columns:
             db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
             for type_ in return_body:
-                db_body[TYPEID] = type_[TYPE_ID]
+                db_body[TYPE_ID] = type_[TYPE_ID_PATH]
                 type_[COLUMNS] = clean_columns_output(self.db.find(db_body), return_column_data)
 
         if len(return_body) < 1: return "No Semantic types matching the given parameters were found", 404
         return json_response(return_body, 200)
 
 
-    def semantic_types_post(self, args):
+    def semantic_types_post_put(self, args, force):
         #### Assert args are valid
         args = args.copy()
         class_ = args.pop(CLASS, None)
@@ -189,19 +238,7 @@ class Server(object):
         if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
 
         #### Add the type
-        return self._create_semantic_type(class_, property_)
-
-
-    def semantic_types_put(self, args):
-        #### Assert args are valid
-        args = args.copy()
-        class_ = args.pop(CLASS, None)
-        property_ = args.pop(PROPERTY, None)
-        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
-
-        #### Add the type
-        return self._create_semantic_type(class_, property_, True)
+        return self._create_semantic_type(class_, property_, force)
 
 
     def semantic_types_delete(self, args):
@@ -210,6 +247,7 @@ class Server(object):
         args = args.copy()
         class_ = args.pop(CLASS, None)
         property_ = args.pop(PROPERTY, None)
+        type_ids = args.pop(TYPE_IDS).split(",") if args.get(TYPE_IDS) else None
         namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
         source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
         column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
@@ -225,13 +263,14 @@ class Server(object):
         # Find the parent semantic types and everything below them of everything which meets column requirements
         type_ids_to_delete = []
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
+        if type_ids is not None: db_body[TYPE_IDS] = {"$in": type_ids}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
-        if column_ids is not None: db_body[COLUMN_ID] = {"$in": column_ids}
+        if column_ids is not None: db_body[COLUMN_ID_PATH] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
         for col in self.db.find(db_body):
-            if col[TYPEID] not in type_ids_to_delete:
-                type_ids_to_delete.append(col[TYPEID])
+            if col[TYPE_ID] not in type_ids_to_delete:
+                type_ids_to_delete.append(col[TYPE_ID])
 
         # Find the semantic types which meet the other requirements and delete all types which need to be
         possible_types = []
@@ -247,7 +286,7 @@ class Server(object):
             for id_ in type_ids_to_delete:
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
-            db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}
+            db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: {"$in": type_ids_to_delete}}
             found_columns = list(self.db.find(db_body))
             for col in found_columns:
                 Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
@@ -272,7 +311,7 @@ class Server(object):
         return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
 
         #### Get the columns
-        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
+        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
@@ -282,7 +321,7 @@ class Server(object):
         return json_response(clean_columns_output(result, return_column_data), 200)
 
 
-    def semantic_types_columns_post(self, type_id, args, body):
+    def semantic_types_columns_post_put(self, type_id, args, body, force):
         #### Assert args are valid
         if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
         args = args.copy()
@@ -296,35 +335,12 @@ class Server(object):
         #### Add the column
         body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
         if body_useful: body = body.split("\n")
-        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [])
+        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [], force)
         if result[1] == 201 and body_useful:
             att = Attribute(column_name, source_name, type_id)
             for value in body:
                 att.add_value(value)
             att.save(INDEX_NAME)
-        return result
-
-
-    def semantic_types_columns_put(self, type_id, args, body):
-        #### Assert args are valid
-        if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
-        args = args.copy()
-        column_name = args.pop(COLUMN_NAME, None)
-        source_name = args.pop(SOURCE_NAME, None)
-        model = args.pop(MODEL, None)
-        if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
-        if model is None: model = "default"
-
-        #### Add/Replace the column
-        body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
-        if body_useful: body = body.split("\n")
-        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [], True)
-        if result[1] == 201 and body_useful:
-            att = Attribute(column_name, source_name, type_id)
-            for value in body:
-                att.add_value(value)
-            att.update(INDEX_NAME)
         return result
 
 
@@ -339,7 +355,7 @@ class Server(object):
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
 
         #### Delete the columns
-        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id}
+        db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
@@ -348,10 +364,8 @@ class Server(object):
         if len(found_columns) < 1: return "No columns were found with the given parameters", 404
         for col in found_columns:
             Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
-        self.db.delete_many(db_body)
 
-        # FIXME: this is returning incorrect number of types deleted
-        return str(len(found_columns)) + " columns deleted successfully", 200
+        return str(self.db.delete_many(db_body).deleted_count) + " columns deleted successfully", 200
 
 
     ################ SemanticTypesColumnData ################
@@ -368,32 +382,14 @@ class Server(object):
         return json_response(clean_column_output(result[0]), 200)
 
 
-    def semantic_types_column_data_post(self, column_id, args, body):
+    def semantic_types_column_data_post_put(self, column_id, args, body, force):
         #### Assert args are valid
         if body is None or body == "": return "Invalid message body", 400
         if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
         if len(args) > 0: return "Invalid arguments, there should be none", 400
 
         #### Add the data
-        return self._add_data_to_column(column_id, body.split("\n"))
-
-
-    def semantic_types_column_data_put(self, column_id, args, body):
-        #### Assert args are valid
-        if body is None or body == "": return "Invalid message body", 400
-        if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
-        if len(args) > 0: return "Invalid arguments, there should be none", 400
-
-        #### Replace the data
-        values = body.split("\n")
-        result = self._add_data_to_column(column_id, values, True)
-        if result[1] == 201:
-            column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-            att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
-            for value in values:
-                att.add_value(value)
-            att.save(INDEX_NAME)
-        return result
+        return self._add_data_to_column(column_id, body.split("\n"), force)
 
 
     def semantic_types_column_data_delete(self, column_id, args):
@@ -491,7 +487,6 @@ class Server(object):
     def bulk_add_models_delete(self, args):
         #### Assert args are valid
         args = args.copy()
-        no_args = len(args) < 1
         model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
@@ -499,10 +494,9 @@ class Server(object):
 
         #### Delete the model
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
-        if not no_args:
-            if model_ids is not None: db_body[ID] = {"$in": model_ids}
-            if model_names is not None: db_body[NAME] = {"$in": model_names}
-            if model_desc is not None: db_body[MODEL_DESC] = model_desc
+        if model_ids is not None: db_body[ID] = {"$in": model_ids}
+        if model_names is not None: db_body[NAME] = {"$in": model_names}
+        if model_desc is not None: db_body[MODEL_DESC] = model_desc
         deleted_count = self.db.delete_many(db_body).deleted_count
 
         if deleted_count < 1: return "No models were found with the given parameters", 404

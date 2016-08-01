@@ -4,6 +4,7 @@ from flask_cors import CORS
 from flask_restful import Api, Resource
 from flask_restful_swagger import swagger
 
+from service import *
 import service.serverLogic
 
 
@@ -18,9 +19,13 @@ service = service.serverLogic.Server()
 #  This class is only used for what gets called by the API and swagger docs.  There isn't any logic code here aside from the   #
 #  try/catch for returning 500's since I think it would be messy and harder to maintain.  It's all in service/serverLogic.py   #
 #                                                                                                                              #
+#  All of the constant values used here are set in service/__init__.py                                                         #
+#                                                                                                                              #
 #  Each of the API functions in this class should call a helper function in the Server class of serverLogic.py whose name      #
 #  follows the form of {class_name}_{type}, where {class_name} is the name of the class in this file, but with underscores     #
-#  instead of camelCase and {type} is the HTTP method name, such as GET or POST.  Example: semantic_types_get()                #
+#  instead of camelCase and {type} is the HTTP method name, such as GET or DELETE.  Example: semantic_types_get()              #
+#  Note that POST and PUT call the same method since the code for each of them is nearly identical.  These follow the form:    #
+#  {class_name}_post_put().  Example: semantic_types_post_put()                                                                #
 #                                                                                                                              #
 ################################################################################################################################
 
@@ -29,7 +34,7 @@ class parameters(object):
     @staticmethod
     def type_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": "type_id" if param_type == "path" else "typeIds" if multiple else "typeId",
+            "name": TYPE_ID_PATH if param_type == "path" else TYPE_IDS if multiple else TYPEID,
             "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
             "required": required,
             "allowMultiple": multiple,
@@ -41,7 +46,7 @@ class parameters(object):
     @staticmethod
     def class_(required=False):
         return {
-            "name": "class",
+            "name": CLASS,
             "description": "Uri of a class",
             "required": required,
             "allowMultiple": False,
@@ -53,7 +58,7 @@ class parameters(object):
     @staticmethod
     def property(required=False):
         return {
-            "name": "property",
+            "name": PROPERTY,
             "description": "Uri of a property",
             "required": required,
             "allowMultiple": False,
@@ -65,7 +70,7 @@ class parameters(object):
     @staticmethod
     def namespaces(required=False):
         return {
-            "name": "namespaces",
+            "name": NAMESPACES,
             "description": "List of URIs of parent URIs of property which to consider",
             "required": required,
             "allowMultiple": True,
@@ -77,7 +82,7 @@ class parameters(object):
     @staticmethod
     def source_names(required=False, desc="List of source names that the column(s) should have", multiple=True):
         return {
-            "name": "sourceNames" if multiple else "sourceName",
+            "name": SOURCE_NAMES if multiple else SOURCE_NAME,
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -89,7 +94,7 @@ class parameters(object):
     @staticmethod
     def column_names(required=False, desc="List of column names which the semantic type(s) should have", multiple=True):
         return {
-            "name": "columnNames" if multiple else "columnName",
+            "name": COLUMN_NAMES if multiple else COLUMN_NAME,
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -101,7 +106,7 @@ class parameters(object):
     @staticmethod
     def column_ids(required=False, desc="List of column ids which the semantic type(s) should have", multiple=True, param_type="query"):
         return {
-            "name": "column_id" if param_type == "path" else "columnIds" if multiple else "columnId",
+            "name": COLUMN_ID_PATH if param_type == "path" or multiple else COLUMN_IDS,
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -113,7 +118,7 @@ class parameters(object):
     @staticmethod
     def models(required=False, desc="List of models which the column(s) should have", multiple=True):
         return {
-            "name": "models" if multiple else "model",
+            "name": MODELS if multiple else MODEL,
             "description": desc,
             "required": required,
             "allowMultiple": multiple,
@@ -125,7 +130,7 @@ class parameters(object):
     @staticmethod
     def return_column_data(desc="If the data in the columns should be in the return body"):
         return {
-            "name": "returnColumnData",
+            "name": RETURN_COLUMN_DATA,
             "description": desc,
             "required": False,
             "allowMultiple": False,
@@ -137,7 +142,7 @@ class parameters(object):
     @staticmethod
     def body(required=False, desc="List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones"):
         return {
-            "name": "body",
+            "name": BODY,
             "description": desc,
             "required": required,
             "allowMultiple": False,
@@ -149,7 +154,7 @@ class parameters(object):
     @staticmethod
     def model_names(required=False):
         return {
-            "name": "modelNames",
+            "name": MODEL_NAMES,
             "description": "Name of the models",
             "required": required,
             "allowMultiple": True,
@@ -159,9 +164,21 @@ class parameters(object):
 
 
     @staticmethod
+    def model(desc):
+        return {
+            "name": MODEL,
+            "description": desc,
+            "required": False,
+            "allowMultiple": False,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
+
+    @staticmethod
     def model_desc(required=False):
         return {
-            "name": "modelDesc",
+            "name": MODEL_DESC,
             "description": "Part or all of a model description",
             "required": required,
             "allowMultiple": False,
@@ -173,7 +190,7 @@ class parameters(object):
     @staticmethod
     def model_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": "model_id" if param_type == "path" else "modelIds" if multiple else "modelId",
+            "name": MODEL_ID_PATH if param_type == "path" else MODEL_IDS if multiple else MODEL_ID,
             "description": "Id(s) of the model.json",
             "required": required,
             "allowMultiple": multiple,
@@ -261,7 +278,7 @@ class SemanticTypes(Resource):
             parameters.column_ids(),
             parameters.models(),
             {
-                "name": "returnColumns",
+                "name": RETURN_COLUMNS,
                 "description": "If the columns for the semantic type(s) should be in the return body",
                 "required": False,
                 "allowMultiple": False,
@@ -319,7 +336,7 @@ class SemanticTypes(Resource):
         Create a semantic type
         Creates a semantic type and returns its id.
         """
-        try: return service.semantic_types_post(request.args)
+        try: return service.semantic_types_post_put(request.args, False)
         except: return str(traceback.format_exc()), 500
 
 
@@ -335,7 +352,7 @@ class SemanticTypes(Resource):
         Create/Replace a semantic type
         Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that replacing a semantic type will remove all of it's columns.
         """
-        try: return service.semantic_types_put(request.args)
+        try: return service.semantic_types_post_put(request.args, True)
         except: return str(traceback.format_exc()), 500
 
 
@@ -350,7 +367,7 @@ class SemanticTypes(Resource):
             parameters.column_ids(),
             parameters.models(),
             {
-                "name": "deleteAll",
+                "name": DELETE_ALL,
                 "description": "Set this to true to delete all semantic types",
                 "required": False,
                 "allowMultiple": False,
@@ -423,7 +440,7 @@ class SemanticTypeColumns(Resource):
         Add a column to a semantic type
         Creates the column and returns the id
         """
-        try: return service.semantic_types_columns_post(type_id, request.args, request.data)
+        try: return service.semantic_types_columns_post_put(type_id, request.args, request.data, False)
         except: return str(traceback.format_exc()), 500
 
 
@@ -442,7 +459,7 @@ class SemanticTypeColumns(Resource):
         Add/Replace a column to a semantic type
         Creates the column if it does not exist and replaces the column if it does, then returns the id if the column.
         """
-        try: return service.semantic_types_columns_put(type_id, request.args, request.data)
+        try: return service.semantic_types_columns_post_put(type_id, request.args, request.data, True)
         except: return str(traceback.format_exc()), 500
 
 
@@ -506,7 +523,7 @@ class SemanticTypeColumnData(Resource):
         Adds data to the given column
         Appends data to the given column.  Use put to replace the data instead
         """
-        try: return service.semantic_types_column_data_post(column_id, request.args, request.data)
+        try: return service.semantic_types_column_data_post_put(column_id, request.args, request.data, False)
         except: return str(traceback.format_exc()), 500
 
 
@@ -522,7 +539,7 @@ class SemanticTypeColumnData(Resource):
         Replaces the data in the column
         Replaces the data in the column with the provided data
         """
-        try: return service.semantic_types_column_data_put(column_id, request.args, request.data)
+        try: return service.semantic_types_column_data_post_put(column_id, request.args, request.data, True)
         except: return str(traceback.format_exc()), 500
 
 
@@ -546,7 +563,7 @@ class BulkAddModels(Resource):
             parameters.model_names(),
             parameters.model_desc(),
             {
-                "name": "showAllData",
+                "name": SHOW_ALL,
                 "description": "Show all of the model data",
                 "required": False,
                 "allowMultiple": False,
@@ -577,14 +594,7 @@ class BulkAddModels(Resource):
 
     @swagger.operation(
         parameters=[
-            {
-                "name": "model",
-                "description": "The model for each of the created columns to be, if none is given 'bulk_add' will be used",
-                "required": False,
-                "allowMultiple": False,
-                "dataType": "string",
-                "paramType": "query"
-            },
+            parameters.model("The model for each of the created columns to be, if none is given 'bulk_add' will be used"),
             parameters.body(True, "The model.json file")
         ],
         responseMessages=responses.standard_put()
@@ -632,14 +642,7 @@ class BulkAddModelData(Resource):
     @swagger.operation(
         parameters=[
             parameters.model_id(True, False, "path"),
-            {
-                "name": "model",
-                "description": "The model of the columns the data should be sent to, if none is given 'bulk_add' will be used",
-                "required": False,
-                "allowMultiple": False,
-                "dataType": "string",
-                "paramType": "query"
-            },
+            parameters.model("The model of the columns the data should be sent to, if none is given 'bulk_add' will be used"),
             parameters.body(True, "The jsonlines which contain the data to add")
         ],
         responseMessages=responses.standard_put()
@@ -653,10 +656,10 @@ class BulkAddModelData(Resource):
         except: return str(traceback.format_exc()), 500
 
 
-api.add_resource(Predict, '/predict')
-api.add_resource(SemanticTypes, '/semantic_types')
-api.add_resource(SemanticTypeColumns, '/semantic_types/<string:type_id>')
-api.add_resource(SemanticTypeColumnData, '/semantic_types/type/<string:column_id>')
-api.add_resource(BulkAddModels, '/bulk_add_models')
-api.add_resource(BulkAddModelData, '/bulk_add_models/<string:model_id>')
+api.add_resource(Predict, "/predict")
+api.add_resource(SemanticTypes, "/semantic_types")
+api.add_resource(SemanticTypeColumns, "/semantic_types/<string:" + TYPE_ID_PATH + ">")
+api.add_resource(SemanticTypeColumnData, "/semantic_types/type/<string:" + COLUMN_ID_PATH + ">")
+api.add_resource(BulkAddModels, "/bulk_add_models")
+api.add_resource(BulkAddModelData, "/bulk_add_models/<string:" + MODEL_ID + ">")
 app.run(debug=True, port=5000, use_reloader=False)
