@@ -34,7 +34,7 @@ class parameters(object):
     @staticmethod
     def type_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": TYPE_ID_PATH if param_type == "path" else TYPE_IDS if multiple else TYPEID,
+            "name": TYPE_ID_PATH if param_type == "path" else TYPE_IDS if multiple else TYPE_ID,
             "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
             "required": required,
             "allowMultiple": multiple,
