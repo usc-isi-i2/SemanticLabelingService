@@ -152,7 +152,6 @@ class Server(object):
     ################ Predict ################
 
     def predict_post(self, args, body):
-        # FIXME: cannot handle columns with all ""
         #### Assert args and body are valid
         if body is None or body == "": return "Invalid message body", 400
         args = args.copy()
@@ -168,6 +167,7 @@ class Server(object):
             for col in self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}):
                 source_names.add(col[SOURCE_NAME])
             source_names = list(source_names)
+        if len(source_names) < 1: return "You must have columns to be able to predict", 400
 
         #### Predict the types
         ## Do the actual predicting using the semantic labeler
