@@ -24,6 +24,23 @@ SOURCE                  = "source"       # A column's source
 DESC                    = "description"  # Bulk add model description
 BULK_ADD_MODEL_DATA     = "bulkAddData"  # The full model that was given to the POST /bulk_add_models
 
+######## Bulk Add model.json Constants ########
+BAC_NAME = "name"
+BAC_GRAPH = "graph"
+BAC_NODES = "nodes"
+BAC_COLUMN_NAME = "columnName"
+BAC_USER_SEMANTIC_TYPES = "userSemanticTypes"
+BAC_CLASS = "domain"
+BAC_PROPERTY = "type"
+BAC_LEARNED_SEMANTIC_TYPES = "learnedSemanticTypes"
+BAC_CONFIDENCE_SCORE = "confidenceScore"
+BAC_URI = "uri"
+BAC_COLUMN_NAME_FILE_NAME = "file_name"
+
+######## Semantic Labeler Terms ########
+SL_CONFIDENCE_SCORE = "prob"
+SL_SEMANTIC_TYPE = "semantic_type"
+
 ######## Path Parameters ########
 COLUMN_ID_PATH = "column_id"
 TYPE_ID_PATH   = "type_id"
