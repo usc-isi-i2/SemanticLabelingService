@@ -199,6 +199,18 @@ class parameters(object):
         }
 
 
+    @staticmethod
+    def crunch_data():
+        return {
+            "name": DO_NOT_CRUNCH_DATA_NOW,
+            "description": "If this is true, the model will not be evaluated and whatever is currently stored will be used",
+            "required": False,
+            "allowMultiple": False,
+            "dataType": "boolean",
+            "paramType": "query"
+        }
+
+
 class responses(object):
     @staticmethod
     def standard_get():
@@ -562,6 +574,7 @@ class BulkAddModels(Resource):
             parameters.model_id(),
             parameters.model_names(),
             parameters.model_desc(),
+            parameters.crunch_data(),
             {
                 "name": SHOW_ALL,
                 "description": "Show all of the model data",
@@ -576,7 +589,7 @@ class BulkAddModels(Resource):
     def get(self):
         """
         Get bulk add models
-        Returns all of the models which fit all of the given parameters (and all of them if no parameters are given).  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  Return body will have the following format:
+        Returns all of the models which fit all of the given parameters (and all of them if no parameters are given).  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db will be updated as well as returned as long as showAllData is true.  Return body will have the following format:
         <pre>
         [
             {
@@ -612,7 +625,7 @@ class BulkAddModels(Resource):
         parameters=[
             parameters.model_id(),
             parameters.model_names(),
-            parameters.model_desc(),
+            parameters.model_desc()
         ],
         responseMessages=responses.standard_delete()
     )
@@ -627,13 +640,16 @@ class BulkAddModels(Resource):
 
 class BulkAddModelData(Resource):
     @swagger.operation(
-        parameters=[parameters.model_id(True, False, "path")],
+        parameters=[
+            parameters.model_id(True, False, "path"),
+            parameters.crunch_data()
+        ],
         responseMessages=responses.standard_get()
     )
     def get(self, model_id):
         """
         Gets the current state of a bulk add model
-        Returns the current state of the given bulk add model id
+        Returns the current state of the given bulk add model id.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db will be updated as well as returned.
         """
         try: return service.bulk_add_model_data_get(model_id, request.args)
         except: return str(traceback.format_exc()), 500

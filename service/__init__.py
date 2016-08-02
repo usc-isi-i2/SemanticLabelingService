@@ -48,11 +48,12 @@ RETURN_COLUMNS     = "returnColumns"
 RETURN_COLUMN_DATA = "returnColumnData"
 BODY               = "body"
 #### Query parameters and return values for bulk add ####
-SHOW_ALL    = "showAllData"
-MODEL_NAMES = "modelNames"
-MODEL_DESC  = "modelDesc"
-MODEL_IDS   = "modelIds"
-MODEL_ID    = "modelId"
+SHOW_ALL               = "showAllData"
+MODEL_NAMES            = "modelNames"
+MODEL_DESC             = "modelDesc"
+MODEL_IDS              = "modelIds"
+MODEL_ID               = "modelId"
+DO_NOT_CRUNCH_DATA_NOW = "doNotCrunchDataNow"
 
 ######## Other return names ########
 SCORE = "score"

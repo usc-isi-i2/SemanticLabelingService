@@ -453,8 +453,10 @@ class Server(object):
         model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
         model_desc = args.pop(MODEL_DESC, None)
         show_all = args.pop(SHOW_ALL, None)
+        crunch_data = args.pop(DO_NOT_CRUNCH_DATA_NOW, None)
         if len(args) > 0: return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
         show_all = True if show_all is not None and show_all.lower() == "true" else False
+        crunch_data = False if crunch_data is not None and crunch_data.lower() == "false" else True
 
         #### Find the model
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
@@ -471,8 +473,7 @@ class Server(object):
             o[MODEL_ID] = mod[ID]
             o[NAME] = mod[NAME]
             o[DESC] = mod[DESC]
-            # TODO: add crunchDataNow
-            if show_all: o[MODEL] = self._update_bulk_add_model(mod[BULK_ADD_MODEL_DATA], mod[MODEL])
+            if show_all: o[MODEL] = self._update_bulk_add_model(mod[BULK_ADD_MODEL_DATA], mod[MODEL]) if crunch_data else mod[BULK_ADD_MODEL_DATA]
             return_body.append(o)
         return json_response(return_body, 200)
 
@@ -545,15 +546,16 @@ class Server(object):
 
     def bulk_add_model_data_get(self, model_id, args):
         if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
-        if len(args) > 0: return "Invalid arguments, there should be none", 400
+        crunch_data = args.pop(DO_NOT_CRUNCH_DATA_NOW, None)
+        if len(args) > 0: return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
+        crunch_data = False if crunch_data is not None and crunch_data.lower() == "false" else True
 
         #### Get the model
         db_result = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
         if len(db_result) < 1: return "A model was not found with the given id", 404
         if len(db_result) > 1: return "More than one model was found with the given id", 500
         db_result = db_result[0]
-        # TODO: add crunchDataNow
-        return json_response(self._update_bulk_add_model(db_result[BULK_ADD_MODEL_DATA], db_result[MODEL]), 200)
+        return json_response(self._update_bulk_add_model(db_result[BULK_ADD_MODEL_DATA], db_result[MODEL]) if crunch_data else db_result[BULK_ADD_MODEL_DATA], 200)
 
 
     def bulk_add_model_data_post(self, model_id, args, body):
