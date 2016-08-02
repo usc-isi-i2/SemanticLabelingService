@@ -109,9 +109,50 @@ class Server(object):
         return "Column data updated", 201
 
 
+    def _predict_column(self, column_name, source_names, data):
+        """
+        Predicts the semantic type of a column.
+
+        :param column_name:  Name of the column
+        :param source_names: List of source names
+        :param data:         The data to predict based opon
+        :return: A list of dictionaries which each contain the semantic type and confidence score
+        """
+        att = Attribute(column_name, source_names[0])
+        for value in data:
+            att.add_value(value)
+        return att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
+
+
+    def _update_bulk_add_model(self, model, column_model):
+        """
+        Updates the bulk add model in the db and also returns it
+
+        :param model:        The current bulk add model
+        :param column_model: The model of the columns which are being updated against
+        :return: The updated bulk add model
+        """
+        for n in model["graph"]["nodes"]:
+            if n.get("columnName"):
+                if n["columnName"] == "file_name":
+                    continue
+                column_id = get_column_id(get_type_id(n["userSemanticTypes"][0]["domain"]["uri"], n["userSemanticTypes"][0]["type"]["uri"]), n["columnName"], model["name"], column_model)
+                prediction = self._predict_column(n["columnName"], [model["name"]], self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})[DATA])
+                n["learnedSemanticTypes"] = []
+                for t in prediction:
+                    type_info = decode_type_id(t["semantic_type"])
+                    od = collections.OrderedDict()
+                    od["domain"] = {"uri": type_info[0]}
+                    od["type"] = {"uri": type_info[1]}
+                    od["confidenceScore"] = t["prob"]
+                    n["learnedSemanticTypes"].append(od)
+        self.db.update_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"]}, {"$set": {BULK_ADD_MODEL_DATA: model}})
+        return model
+
     ################ Predict ################
 
     def predict_post(self, args, body):
+        # FIXME: cannot handle columns with all ""
         #### Assert args and body are valid
         if body is None or body == "": return "Invalid message body", 400
         args = args.copy()
@@ -130,10 +171,7 @@ class Server(object):
 
         #### Predict the types
         ## Do the actual predicting using the semantic labeler
-        att = Attribute(column_names[0], source_names[0])
-        for value in body.split("\n"):
-            att.add_value(value)
-        prediction = att.predict_type(INDEX_NAME, source_names, Searcher.search_columns_data(INDEX_NAME, source_names), self.classifier, CONFIDENCE)
+        prediction = self._predict_column(column_names[0], source_names, body.split("\n"))
         if len(prediction) < 1: return "No matches found", 404
 
         ## Filter the results
@@ -433,16 +471,16 @@ class Server(object):
             o[MODEL_ID] = mod[ID]
             o[NAME] = mod[NAME]
             o[DESC] = mod[DESC]
-            if show_all:
-                # TODO: possibly update the learned semantic types here
-                o[MODEL] = mod[BULK_ADD_MODEL_DATA]
+            # TODO: add crunchDataNow
+            if show_all: o[MODEL] = self._update_bulk_add_model(mod[BULK_ADD_MODEL_DATA], mod[MODEL])
             return_body.append(o)
-        return json_response(return_body, 601)
+        return json_response(return_body, 200)
 
 
     def bulk_add_models_post(self, args, body):
         #### Assert args are valid
         if body is None or len(body) < 1: return "Invalid message body", 400
+        args = args.copy()
         column_model = args.pop(MODEL, None)
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_model is None: column_model = "bulk_add"
@@ -477,7 +515,7 @@ class Server(object):
                     else: return "Error occurred while adding column for semantic type: " + str(ust), 500
 
         # Nothing bad happened when creating the semantic types and columns, so add the model to the DB
-        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"], BULK_ADD_MODEL_DATA: model})
+        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"], MODEL: column_model, BULK_ADD_MODEL_DATA: model})
         return "Model and columns added, " + str(new_type_count) + " semantic types created, " + \
                str(existed_type_count) + " semantic types already existed, " + \
                str(new_column_count) + " columns created, and " + \
@@ -514,13 +552,14 @@ class Server(object):
         if len(db_result) < 1: return "A model was not found with the given id", 404
         if len(db_result) > 1: return "More than one model was found with the given id", 500
         db_result = db_result[0]
-        # TODO: possibly update the learned semantic types here
-        return json_response(db_result[BULK_ADD_MODEL_DATA], 601)
+        # TODO: add crunchDataNow
+        return json_response(self._update_bulk_add_model(db_result[BULK_ADD_MODEL_DATA], db_result[MODEL]), 200)
 
 
     def bulk_add_model_data_post(self, model_id, args, body):
         if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
         if body is None or len(body) < 1: return "Invalid message body", 400
+        args = args.copy()
         column_model = args.pop(MODEL, None)
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_model is None: column_model = "bulk_add"

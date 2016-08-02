@@ -80,6 +80,17 @@ def get_type_id(class_, property_):
     return base64.b64encode(class_) + ID_DIVIDER + base64.b64encode(property_)
 
 
+def decode_type_id(type_id):
+    """
+    Returns the class and property of the semantic type with the given id.
+
+    :param type_id: Id of the semantic type to decode
+    :return: The semantic type's class and property in the form (class, property)
+    """
+    split_id = type_id.split(ID_DIVIDER)
+    return base64.b64decode(split_id[0]), base64.b64decode(split_id[1])
+
+
 def get_column_id(type_id, column_name, source_name, model):
     """
     Returns the id of the column with the given semantic type id, column name, source name, and model.
