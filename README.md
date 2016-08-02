@@ -16,7 +16,7 @@ Use this service to predict types of data after giving training data, see "Using
 
 ##Using the service
 Before you can predict what kind of data something is you have to create semantic types and columns with data in the semantic types.  The following diagram represents the relationship of the semantic types and columns in the service:
-<center><img src="http://github.com/usc-isi-i2/SemanticLabelingService/blob/master/readme_data/structure.pdf" alt="Data Structure" style="width: 85%"/></center>
+<center><img src="readme_data/structure.png" alt="Data Structure" style="width: 85%"/></center>
 I reccomend using swagger when you are trying the steps below for the first time since you don't have to worry about 
 
 1. Create semantic types by using the `POST /semantic_types` with the class and property you want for the semantic type, just note that the class must be a valid URL which also has a valid (namespace) parent URL.  If you don't have any particular URL you want to use just make one up.
