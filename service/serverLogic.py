@@ -132,21 +132,21 @@ class Server(object):
         :param column_model: The model of the columns which are being updated against
         :return: The updated bulk add model
         """
-        for n in model["graph"]["nodes"]:
-            if n.get("columnName"):
-                if n["columnName"] == "file_name":
+        for n in model[BAC_GRAPH][BAC_NODES]:
+            if n.get(BAC_COLUMN_NAME):
+                if n[BAC_COLUMN_NAME] == BAC_COLUMN_NAME_FILE_NAME:
                     continue
-                column_id = get_column_id(get_type_id(n["userSemanticTypes"][0]["domain"]["uri"], n["userSemanticTypes"][0]["type"]["uri"]), n["columnName"], model["name"], column_model)
-                prediction = self._predict_column(n["columnName"], [model["name"]], self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})[DATA])
-                n["learnedSemanticTypes"] = []
+                column_id = get_column_id(get_type_id(n[BAC_USER_SEMANTIC_TYPES][0][BAC_CLASS][BAC_URI], n[BAC_USER_SEMANTIC_TYPES][0][BAC_PROPERTY][BAC_URI]), n[BAC_COLUMN_NAME], model[BAC_NAME], column_model)
+                prediction = self._predict_column(n[BAC_COLUMN_NAME], [model[BAC_NAME]], self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})[DATA])
+                n[BAC_LEARNED_SEMANTIC_TYPES] = []
                 for t in prediction:
-                    type_info = decode_type_id(t["semantic_type"])
+                    type_info = decode_type_id(t[SL_SEMANTIC_TYPE])
                     od = collections.OrderedDict()
-                    od["domain"] = {"uri": type_info[0]}
-                    od["type"] = {"uri": type_info[1]}
-                    od["confidenceScore"] = t["prob"]
-                    n["learnedSemanticTypes"].append(od)
-        self.db.update_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"]}, {"$set": {BULK_ADD_MODEL_DATA: model}})
+                    od[BAC_CLASS] = {BAC_URI: type_info[0]}
+                    od[BAC_PROPERTY] = {BAC_URI: type_info[1]}
+                    od[BAC_CONFIDENCE_SCORE] = t[SL_CONFIDENCE_SCORE]
+                    n[BAC_LEARNED_SEMANTIC_TYPES].append(od)
+        self.db.update_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model[BAC_ID]}, {"$set": {BULK_ADD_MODEL_DATA: model}})
         return model
 
     ################ Predict ################
@@ -161,7 +161,7 @@ class Server(object):
         source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
         models = args.pop(MODEL).split(",") if args.get(MODEL) else None
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_names is None: column_names = ["default"]
+        if column_names is None: column_names = [DEFAULT_NAME]
         if source_names is None:
             # If no source names are given just use all of the source names in the db
             source_names = set()
@@ -195,11 +195,11 @@ class Server(object):
         for t in prediction:
             # Construct the new return body
             if all_allowed_ids is not None:
-                if t["semantic_type"] not in all_allowed_ids:
+                if t[SL_SEMANTIC_TYPE] not in all_allowed_ids:
                     continue
             o = collections.OrderedDict()
-            o[TYPE_ID_PATH] = t["semantic_type"]
-            o[SCORE] = t["prob"]
+            o[TYPE_ID_PATH] = t[SL_SEMANTIC_TYPE]
+            o[SCORE] = t[SL_CONFIDENCE_SCORE]
             return_body.append(o)
         return json_response(return_body, 200)
 
@@ -368,7 +368,7 @@ class Server(object):
         model = args.pop(MODEL, None)
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
         if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
-        if model is None: model = "default"
+        if model is None: model = DEFAULT_MODEL
 
         #### Add the column
         body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
@@ -484,16 +484,16 @@ class Server(object):
         args = args.copy()
         column_model = args.pop(MODEL, None)
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_model is None: column_model = "bulk_add"
+        if column_model is None: column_model = DEFAULT_BULK_MODEL
 
         #### Assert the required elements exist
         model = json.loads(body)
-        if "id" not in model: return "The given model must have an id", 400
-        if "name" not in model: return "The given model must have a name", 400
-        if "description" not in model: return "The given model must have a description", 400
-        if "graph" not in model: return "The given model must have a graph", 400
-        if "nodes" not in model["graph"]: return "The given model must have nodes within the graph", 400
-        if len(list(self.db.find({ID: model["id"]}))) > 0: return "Model id already exists", 409
+        if BAC_ID not in model: return "The given model must have an id", 400
+        if BAC_NAME not in model: return "The given model must have a name", 400
+        if BAC_DESC not in model: return "The given model must have a description", 400
+        if BAC_GRAPH not in model: return "The given model must have a graph", 400
+        if BAC_NODES not in model[BAC_GRAPH]: return "The given model must have nodes within the graph", 400
+        if len(list(self.db.find({ID: model[BAC_ID]}))) > 0: return "Model id already exists", 409
 
         #### Parse and add the model
         # Try to add of the given semantic types and columns
@@ -501,22 +501,22 @@ class Server(object):
         new_column_count = 0
         existed_type_count = 0
         existed_column_count = 0
-        for n in model["graph"]["nodes"]:
-            if n.get("userSemanticTypes"):
-                for ust in n["userSemanticTypes"]:
-                    semantic_status = self._create_semantic_type(ust["domain"]["uri"], ust["type"]["uri"])
+        for n in model[BAC_GRAPH][BAC_NODES]:
+            if n.get(BAC_USER_SEMANTIC_TYPES):
+                for ust in n[BAC_USER_SEMANTIC_TYPES]:
+                    semantic_status = self._create_semantic_type(ust[BAC_CLASS][BAC_URI], ust[BAC_PROPERTY][BAC_URI])
                     if semantic_status[1] == 201: new_type_count += 1
                     elif semantic_status[1] == 409: existed_type_count += 1
                     elif semantic_status[1] == 400: return semantic_status
                     else: return "Error occurred while adding semantic type: " + str(ust), 500
-                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model)
+                    column_status = self._create_column(get_type_id(ust[BAC_CLASS][BAC_URI], ust[BAC_PROPERTY][BAC_URI]), n[BAC_COLUMN_NAME], model[BAC_NAME], column_model)
                     if column_status[1] == 201: new_column_count += 1
                     elif column_status[1] == 409: existed_column_count += 1
                     elif column_status[1] == 400: return column_status
                     else: return "Error occurred while adding column for semantic type: " + str(ust), 500
 
         # Nothing bad happened when creating the semantic types and columns, so add the model to the DB
-        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"], MODEL: column_model, BULK_ADD_MODEL_DATA: model})
+        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model[BAC_NAME], DESC: model["description"], MODEL: column_model, BULK_ADD_MODEL_DATA: model})
         return "Model and columns added, " + str(new_type_count) + " semantic types created, " + \
                str(existed_type_count) + " semantic types already existed, " + \
                str(new_column_count) + " columns created, and " + \
@@ -564,7 +564,7 @@ class Server(object):
         args = args.copy()
         column_model = args.pop(MODEL, None)
         if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-        if column_model is None: column_model = "bulk_add"
+        if column_model is None: column_model = DEFAULT_BULK_MODEL
 
         #### Process the data
         # Get the model and parse the json lines
@@ -577,15 +577,15 @@ class Server(object):
             if line.strip() != "":
                 data.append(json.loads(line))
         # Get all of the data in each column
-        for n in model["graph"]["nodes"]:
+        for n in model[BAC_GRAPH][BAC_NODES]:
             column_data = []
             for line in data:
-                if n.get("columnName"):
-                    column_data.append(line[n["columnName"]])
+                if n.get(BAC_COLUMN_NAME):
+                    column_data.append(line[n[BAC_COLUMN_NAME]])
             # Add it to the db
-            if n.get("userSemanticTypes"):
-                for ust in n["userSemanticTypes"]:
-                    result = self._add_data_to_column(get_column_id(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model), column_data)[1]
+            if n.get(BAC_USER_SEMANTIC_TYPES):
+                for ust in n[BAC_USER_SEMANTIC_TYPES]:
+                    result = self._add_data_to_column(get_column_id(get_type_id(ust[BAC_CLASS][BAC_URI], ust[BAC_PROPERTY][BAC_URI]), n[BAC_COLUMN_NAME], model[BAC_NAME], column_model), column_data)[1]
                     if result == 201: continue
                     elif result == 404: return "A required column was not found", 404
                     else: return "Error occurred while adding data to the column", 500

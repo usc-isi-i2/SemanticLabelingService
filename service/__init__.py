@@ -5,11 +5,14 @@ from flask import Response
 
 
 ######## General Constants #########
-DATA_MODEL_PATH   = "model/Regression.pkl"  # File path for the model used by the semantic labeling
-INDEX_NAME        = "index_name"            # The index_name for use when saving attributes
-NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'       # Characters not allowed by elastic search
-ID_DIVIDER        = "-"                     # The divider that is used to separate the different parts of ID's, like class and property
-CONFIDENCE        = 0.2                     # Semantic types which have a confidence of lower than this number on predict will not be returned
+DATA_MODEL_PATH    = "model/Regression.pkl"  # File path for the model used by the semantic labeling
+INDEX_NAME         = "index_name"            # The index_name for use when saving attributes
+DEFAULT_NAME       = "default"               # Just a name for using when there isn't one
+DEFAULT_MODEL      = "default"               # Default model name for use when one isn't provided
+DEFAULT_BULK_MODEL = "bulk_add"              # Default model for columns added using bulk add
+NOT_ALLOWED_CHARS  = '[\\/*?"<>|\s\t]'       # Characters not allowed by elastic search
+ID_DIVIDER         = "-"                     # The divider that is used to separate the different parts of ID's, like class and property
+CONFIDENCE         = 0.2                     # Semantic types which have a confidence of lower than this number on predict will not be returned
 
 ######## Mongodb Names ########
 ID                      = "_id"          # ID for any entry in the db
@@ -25,21 +28,23 @@ DESC                    = "description"  # Bulk add model description
 BULK_ADD_MODEL_DATA     = "bulkAddData"  # The full model that was given to the POST /bulk_add_models
 
 ######## Bulk Add model.json Constants ########
-BAC_NAME = "name"
-BAC_GRAPH = "graph"
-BAC_NODES = "nodes"
-BAC_COLUMN_NAME = "columnName"
-BAC_USER_SEMANTIC_TYPES = "userSemanticTypes"
-BAC_CLASS = "domain"
-BAC_PROPERTY = "type"
+BAC_ID                     = "id"
+BAC_URI                    = "uri"
+BAC_NAME                   = "name"
+BAC_DESC                   = "description"
+BAC_GRAPH                  = "graph"
+BAC_NODES                  = "nodes"
+BAC_CLASS                  = "domain"
+BAC_PROPERTY               = "type"
+BAC_COLUMN_NAME            = "columnName"
+BAC_USER_SEMANTIC_TYPES    = "userSemanticTypes"
 BAC_LEARNED_SEMANTIC_TYPES = "learnedSemanticTypes"
-BAC_CONFIDENCE_SCORE = "confidenceScore"
-BAC_URI = "uri"
-BAC_COLUMN_NAME_FILE_NAME = "file_name"
+BAC_CONFIDENCE_SCORE       = "confidenceScore"
+BAC_COLUMN_NAME_FILE_NAME  = "file_name"
 
 ######## Semantic Labeler Terms ########
 SL_CONFIDENCE_SCORE = "prob"
-SL_SEMANTIC_TYPE = "semantic_type"
+SL_SEMANTIC_TYPE    = "semantic_type"
 
 ######## Path Parameters ########
 COLUMN_ID_PATH = "column_id"
