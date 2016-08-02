@@ -354,7 +354,6 @@ class Server(object):
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[ID] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
-        print db_body
         result = list(self.db.find(db_body))
         if len(result) < 1: return "No columns matching the given parameters were found", 404
         return json_response(clean_columns_output(result, return_column_data), 200)
