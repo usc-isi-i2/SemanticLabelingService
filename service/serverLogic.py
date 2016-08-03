@@ -296,6 +296,9 @@ class Server(object):
 
         #### Delete the types
         if delete_all and delete_all.lower() == "true":
+            found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}))
+            for col in found_columns:
+                Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
             return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE, DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
         # Find the parent semantic types and everything below them of everything which meets column requirements
@@ -330,7 +333,7 @@ class Server(object):
                 Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
             self.db.delete_many(db_body)
             deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
-
+        if deleted < 1: return "No semantic types with the given parameters were found", 404
         return str(deleted) + " semantic types matched parameters and were deleted", 200
 
 
