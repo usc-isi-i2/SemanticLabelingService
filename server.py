@@ -17,7 +17,8 @@ service = service.serverLogic.Server()
 ################################################################################################################################
 #                                                                                                                              #
 #  This class is only used for what gets called by the API and swagger docs.  There isn't any logic code here aside from the   #
-#  try/catch for returning 500's since I think it would be messy and harder to maintain.  It's all in service/serverLogic.py   #
+#  try/catch for returning 500's and verifying parameters since I think it would be messy and harder to maintain.  It's all    #
+#  in service/serverLogic.py                                                                                                   #
 #                                                                                                                              #
 #  All of the constant values used here are set in service/__init__.py                                                         #
 #                                                                                                                              #
@@ -275,8 +276,18 @@ class Predict(Resource):
         ]
         </pre>
         """
-        try: return service.predict_post(request.args, request.data)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if request.data is None or request.data == "": return "Invalid message body", 400
+            args = request.args.copy()
+            namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
+            column_names = args.pop(COLUMN_NAME).split(",") if args.get(COLUMN_NAME) else None
+            source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+            models = args.pop(MODEL).split(",") if args.get(MODEL) else None
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if column_names is None: column_names = [DEFAULT_NAME]
+            return service.predict_post(namespaces, column_names, source_names, models, request.data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 class SemanticTypes(Resource):
@@ -332,8 +343,23 @@ class SemanticTypes(Resource):
         </pre>
         Note that giving no parameters will return all semantic types with no columns.
         """
-        try: return service.semantic_types_get(request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            class_ = args.pop(CLASS, None)
+            property_ = args.pop(PROPERTY, None)
+            namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
+            source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+            column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+            column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+            models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+            return_columns = args.pop(RETURN_COLUMNS, None)
+            return_column_data = args.pop(RETURN_COLUMN_DATA, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
+            return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
+            return service.semantic_types_get(class_, property_, namespaces, source_names, column_names, column_ids, models, return_columns, return_column_data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -348,8 +374,15 @@ class SemanticTypes(Resource):
         Create a semantic type
         Creates a semantic type and returns its id.
         """
-        try: return service.semantic_types_post_put(request.args, False)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            class_ = args.pop(CLASS, None)
+            property_ = args.pop(PROPERTY, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
+            return service.semantic_types_post_put(class_, property_, False)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -364,8 +397,15 @@ class SemanticTypes(Resource):
         Create/Replace a semantic type
         Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that replacing a semantic type will remove all of it's columns.
         """
-        try: return service.semantic_types_post_put(request.args, True)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            class_ = args.pop(CLASS, None)
+            property_ = args.pop(PROPERTY, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if class_ is None or property_ is None: return "Both 'class' and 'property' must be specified", 400
+            return service.semantic_types_post_put(class_, property_, True)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -394,8 +434,22 @@ class SemanticTypes(Resource):
         Delete a semantic type
         Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
         """
-        try: return service.semantic_types_delete(request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            if len(args) < 1: return "At least one argument needs to be provided", 400
+            class_ = args.pop(CLASS, None)
+            property_ = args.pop(PROPERTY, None)
+            type_ids = args.pop(TYPE_IDS).split(",") if args.get(TYPE_IDS) else None
+            namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
+            source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+            column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+            column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+            models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+            delete_all = args.pop(DELETE_ALL, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            return service.semantic_types_delete(class_, property_, type_ids, namespaces, source_names, column_names, column_ids, models, delete_all)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 class SemanticTypeColumns(Resource):
@@ -433,8 +487,19 @@ class SemanticTypeColumns(Resource):
         </pre>
         Note that giving no parameters will return all columns with no data.
         """
-        try: return service.semantic_types_columns_get(type_id, request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            args = request.args.copy()
+            column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+            column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+            source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+            models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+            return_column_data = args.pop(RETURN_COLUMN_DATA, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
+            return service.semantic_types_columns_get(type_id, column_ids, column_names, source_names, models, return_column_data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -452,8 +517,18 @@ class SemanticTypeColumns(Resource):
         Add a column to a semantic type
         Creates the column and returns the id
         """
-        try: return service.semantic_types_columns_post_put(type_id, request.args, request.data, False)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            args = request.args.copy()
+            column_name = args.pop(COLUMN_NAME, None)
+            source_name = args.pop(SOURCE_NAME, None)
+            model = args.pop(MODEL, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+            if model is None: model = DEFAULT_MODEL
+            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, request.data, False)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -471,8 +546,18 @@ class SemanticTypeColumns(Resource):
         Add/Replace a column to a semantic type
         Creates the column if it does not exist and replaces the column if it does, then returns the id if the column.
         """
-        try: return service.semantic_types_columns_post_put(type_id, request.args, request.data, True)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            args = request.args.copy()
+            column_name = args.pop(COLUMN_NAME, None)
+            source_name = args.pop(SOURCE_NAME, None)
+            model = args.pop(MODEL, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+            if model is None: model = DEFAULT_MODEL
+            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, request.data, True)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -490,8 +575,17 @@ class SemanticTypeColumns(Resource):
         Delete a column from a semantic type
         Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
         """
-        try: return service.semantic_types_columns_delete(type_id, request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            args = request.args.copy()
+            column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
+            column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
+            source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
+            models = args.pop(MODELS).split(",") if args.get(MODELS) else None
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            return service.semantic_types_columns_delete(type_id, column_ids, column_names, source_names, models)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 class SemanticTypeColumnData(Resource):
@@ -519,8 +613,12 @@ class SemanticTypeColumnData(Resource):
         }
         </pre>
         """
-        try: return service.semantic_types_column_data_get(column_id, request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+            if len(request.args) > 0: return "Invalid arguments, there should be none", 400
+            return service.semantic_types_column_data_get(column_id)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -535,8 +633,13 @@ class SemanticTypeColumnData(Resource):
         Adds data to the given column
         Appends data to the given column.  Use put to replace the data instead
         """
-        try: return service.semantic_types_column_data_post_put(column_id, request.args, request.data, False)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if request.data is None or request.data == "": return "Invalid message body", 400
+            if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+            if len(request.args) > 0: return "Invalid arguments, there should be none", 400
+            return service.semantic_types_column_data_post_put(column_id, request.data, False)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -551,8 +654,13 @@ class SemanticTypeColumnData(Resource):
         Replaces the data in the column
         Replaces the data in the column with the provided data
         """
-        try: return service.semantic_types_column_data_post_put(column_id, request.args, request.data, True)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if request.data is None or request.data == "": return "Invalid message body", 400
+            if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+            if len(request.args) > 0: return "Invalid arguments, there should be none", 400
+            return service.semantic_types_column_data_post_put(column_id, request.data, True)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -564,8 +672,12 @@ class SemanticTypeColumnData(Resource):
         Delete all of the data in a column
         Removes all of the data in the column
         """
-        try: return service.semantic_types_column_data_delete(column_id, request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if column_id is None or len(column_id) < 1: return "Invalid column_id", 400
+            if len(request.args) > 0: return "Invalid arguments, there should be none", 400
+            return service.semantic_types_column_data_delete(column_id)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 class BulkAddModels(Resource):
@@ -601,8 +713,19 @@ class BulkAddModels(Resource):
         ]
         </pre>
         """
-        try: return service.bulk_add_models_get(request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
+            model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
+            model_desc = args.pop(MODEL_DESC, None)
+            show_all = args.pop(SHOW_ALL, None)
+            crunch_data = args.pop(DO_NOT_CRUNCH_DATA_NOW, None)
+            if len(args) > 0: return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
+            show_all = True if show_all is not None and show_all.lower() == "true" else False
+            crunch_data = False if crunch_data is not None and crunch_data.lower() == "false" else True
+            return service.bulk_add_models_get(model_ids, model_names, model_desc, show_all, crunch_data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -617,8 +740,15 @@ class BulkAddModels(Resource):
         Add a bulk add model
         Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types and columns given in the model will be created when this is sent.
         """
-        try: return service.bulk_add_models_post(request.args, request.data)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if request.data is None or len(request.data) < 1: return "Invalid message body", 400
+            args = request.args.copy()
+            column_model = args.pop(MODEL, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if column_model is None: column_model = DEFAULT_BULK_MODEL
+            return service.bulk_add_models_post(column_model, request.data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -634,8 +764,15 @@ class BulkAddModels(Resource):
         Remove a bulk add model
         Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
         """
-        try: return service.bulk_add_models_delete(request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            args = request.args.copy()
+            model_ids = args.pop(MODEL_IDS).split(",") if args.get(MODEL_IDS) else None
+            model_names = args.pop(MODEL_NAMES).split(",") if args.get(MODEL_NAMES) else None
+            model_desc = args.pop(MODEL_DESC, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            return service.bulk_add_models_delete(model_ids, model_names, model_desc)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 class BulkAddModelData(Resource):
@@ -651,8 +788,15 @@ class BulkAddModelData(Resource):
         Gets the current state of a bulk add model
         Returns the current state of the given bulk add model id.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db will be updated as well as returned.
         """
-        try: return service.bulk_add_model_data_get(model_id, request.args)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
+            args = request.args.copy()
+            crunch_data = args.pop(DO_NOT_CRUNCH_DATA_NOW, None)
+            if len(args) > 0: return json_response("The following query parameters are invalid:  " + str(args.keys()), 400)
+            crunch_data = False if crunch_data is not None and crunch_data.lower() == "false" else True
+            return service.bulk_add_model_data_get(model_id, crunch_data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
     @swagger.operation(
@@ -668,8 +812,16 @@ class BulkAddModelData(Resource):
         Add data to the semantic types
         Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns, but faster for large amounts of data.
         """
-        try: return service.bulk_add_model_data_post(model_id, request.args, request.data)
-        except: return str(traceback.format_exc()), 500
+        try:
+            if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
+            if request.data is None or len(request.data) < 1: return "Invalid message body", 400
+            args = request.args.copy()
+            column_model = args.pop(MODEL, None)
+            if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
+            if column_model is None: column_model = DEFAULT_BULK_MODEL
+            return service.bulk_add_model_data_post(model_id, column_model, request.data)
+        except:
+            return str(traceback.format_exc()), 500
 
 
 api.add_resource(Predict, "/predict")

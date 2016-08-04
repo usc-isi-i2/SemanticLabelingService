@@ -4,9 +4,9 @@ Use this service to predict types of data after giving training data, see "Using
 
 
 ##Software Requirements
-* Python 2.7
-* Elasticsearch
-* MongoDB
+* [Python 2.7](https://www.python.org/downloads/)
+* [MongoDB](https://www.mongodb.com/download-center#community)
+* [Elasticsearch](https://www.elastic.co/downloads/elasticsearch)
 * Pyspark
 * scikit-learn (maybe?)
 * pandas (maybe?)
