@@ -4,19 +4,20 @@ Use this service to predict types of data after giving training data, see "Using
 
 
 ##Software Requirements
-* [Python 2.7](https://www.python.org/downloads/)
-* [MongoDB](https://www.mongodb.com/download-center#community)
-* [Elasticsearch](https://www.elastic.co/downloads/elasticsearch)
-* Pyspark
-* scikit-learn (maybe?)
-* pandas (maybe?)
-
-
+* Python 2.7 - [Download](https://www.python.org/downloads/)
+	* Pip - If you're on Ubuntu just install "python-pip"
+* MongoDB - If you're on Ubuntu just install "mongodb-server"
+* Elasticsearch - [Download](https://www.elastic.co/downloads/elasticsearch)
+* Apache Spark - [Download](http://spark.apache.org/downloads.html)
+	* This can be a pain to get to work properly, you may find the sample code below to put in you `~/.bashrc` or `~/.bash_profile` helpful, just don't forget to change the two {{path to spark}} and {{version number}}:<pre>
+export PATH={{path to spark}}/bin:$PATHexport SPARK_HOME="{{path to spark}}"export PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/build:$PYTHONPATHexport PYTHONPATH=$SPARK_HOME/python/lib/py4j-{{version number}}-src.zip:$PYTHONPATH
+</pre>
 
 ##Running the service
 1. Start MongoDB by running "mongod" in the terminal
-2. Start Elasticsearch by running the "elasticsearch" in your main elasticsearch directory
+2. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
 3. Run "server.py"
+4. If you get a "No module named {insert name here}" error just run "pip install {insert name here}" in terminal (just make sure pip is installing to the correct python installation if you have more than one)
 
 
 
