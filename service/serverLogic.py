@@ -30,7 +30,6 @@ class Server(object):
         :param force:       Force create the column, if this is true and the column exists the old column will be deleted (with all of its data) before creation
         :return: The id of the new column and a response code of 201 if the creation was successful, otherwise it will be an error message with the appropriate error code
         """
-
         column_id = get_column_id(type_id, column_name, source_name, model)
         db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model}
         if self.db.find_one(db_body):
@@ -63,7 +62,7 @@ class Server(object):
 
     def _update_bulk_add_model(self, model, column_model):
         """
-        Updates the bulk add model in the db and also returns it
+        Updates the bulk add model in the db and also returns it.
 
         :param model:        The current bulk add model
         :param column_model: The model of the columns which are being updated against
@@ -89,7 +88,17 @@ class Server(object):
 
     ################ Predict ################
 
-    def predict_post(self, namespaces, column_names, source_names, models, body):
+    def predict_post(self, data, namespaces=None, column_names=None, source_names=None, models=None):
+        """
+        Predicts the semantic type of the given data.
+
+        :param namespaces:   List of allowed namespaces
+        :param column_names: List of allowed column names
+        :param source_names: List of allowed source names
+        :param models:       List of allowed column models
+        :param data:         List of the data values to predict.
+        :return: A return message (if it is successful this will be a list of the predicted types) and a return code
+        """
         if source_names is None:
             # If no source names are given just use all of the source names in the db
             source_names = set()
@@ -100,7 +109,7 @@ class Server(object):
 
         #### Predict the types
         ## Do the actual predicting using the semantic labeler
-        prediction = self._predict_column(column_names[0], source_names, body.split("\n"))
+        prediction = self._predict_column(column_names[0], source_names, data)
         if len(prediction) < 1: return "No matches found", 404
 
         ## Filter the results
@@ -135,8 +144,21 @@ class Server(object):
 
     ################ SemanticTypes ################
 
-    def semantic_types_get(self, class_, property_, namespaces, source_names, column_names, column_ids, models, return_columns, return_column_data):
-        #### Get the types
+    def semantic_types_get(self, class_=None, property_=None, namespaces=None, source_names=None, column_names=None, column_ids=None, models=None, return_columns=False, return_column_data=False):
+        """
+        Returns all of the semantic types (and optionally their columns and columns' data) filtered by the given parameters.
+
+        :param class_:             The class of the semantic types to get
+        :param property_:          The property of the semantic types to get
+        :param namespaces:         The possible namespaces of the semantic types to get
+        :param source_names:       The possible source names of at least one column of a semantic type must have
+        :param column_names:       The possible column names of at least one column of a semantic type must have
+        :param column_ids:         The possible column ids of at least one column of a semantic type must have
+        :param models:             The possible column model of at least one column of a semantic type must have
+        :param return_columns:     True if all of the columns (but not the data in the columns) should be returned with the semantic types
+        :param return_column_data: True if all of the columns and their data should be returned with the semantic types
+        :return: All of the semantic types which fit the following parameters
+        """
         # Find all of the type ids that satisfy the class, property, and namespaces
         db_body = {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE}
         if class_ is not None: db_body[CLASS] = class_
@@ -181,7 +203,7 @@ class Server(object):
         return json_response(return_body, 200)
 
 
-    def semantic_types_post_put(self, class_, property_, force):
+    def semantic_types_post_put(self, class_, property_, force=False):
         """
         Creates a semantic type and returns the id if it was successful.
 
@@ -192,7 +214,6 @@ class Server(object):
         :param force:     Force create the semantic type, if this is true and the type already exists the existing type (and all of its columns and data) will be deleted before creation
         :return: The id of the new semantic type and a response code of 201 if the creation was successful, otherwise it will be an error message with the appropriate error code
         """
-
         class_ = class_.rstrip("/")
         property_ = property_.rstrip("/")
 
@@ -218,8 +239,24 @@ class Server(object):
         return type_id, 201
 
 
-    def semantic_types_delete(self, class_, property_, type_ids, namespaces, source_names, column_names, column_ids, models, delete_all):
-        if delete_all and delete_all.lower() == "true":
+    def semantic_types_delete(self, class_=None, property_=None, type_ids=None, namespaces=None, source_names=None, column_names=None, column_ids=None, models=None, delete_all=False):
+        """
+        Deletes all of the semantic types (and all of their columns/data) that fit the given parameters.
+
+        :param class_:       The class of the semantic types to delete
+        :param property_:    The property of the semantic types to delete
+        :param type_ids:     The possible ids of the semantic types to delete
+        :param namespaces:   The possible namespaces of the semantic types to delete
+        :param source_names: The possible source names of at least one column of a semantic type must have
+        :param column_names: The possible column names of at least one column of a semantic type must have
+        :param column_ids:   The possible column ids of at least one column of a semantic type must have
+        :param models:       The possible column model of at least one column of a semantic type must have
+        :param delete_all:   Set this to true if all semantic types should be deleted
+        :return: The amount of semantic types deleted and a 200 if it worked, otherwise and error message with the appropriate code
+        """
+        if class_ is None and property_ is None and type_ids is None and namespaces is None and source_names is None and column_names is None and column_ids is None and models is None and not delete_all:
+            return "To delete all semantic types give deleteAll as true", 400
+        if delete_all:
             found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}))
             for col in found_columns:
                 Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
@@ -263,8 +300,18 @@ class Server(object):
 
     ################ SemanticTypesColumns ################
 
-    def semantic_types_columns_get(self, type_id, column_ids, column_names, source_names, models, return_column_data):
-        #### Get the columns
+    def semantic_types_columns_get(self, type_id, column_ids=None, column_names=None, source_names=None, models=None, return_column_data=False):
+        """
+        Returns all of the columns in a semantic type that fit the given parameters.
+
+        :param type_id:            The id of the semantic type
+        :param column_ids:         The possible ids of the columns to be returned
+        :param column_names:       The possible names of the columns to be returned
+        :param source_names:       The possible source names of the columns to be returned
+        :param models:             The possible models of the columns to be returned
+        :param return_column_data: True if all of the data in the column should be returned with the columns
+        :return: All of the columns in the semantic type that fit the given parameters
+        """
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
@@ -275,21 +322,38 @@ class Server(object):
         return json_response(clean_columns_output(result, return_column_data), 200)
 
 
-    def semantic_types_columns_post_put(self, type_id, column_name, source_name, model, body, force):
-        #### Add the column
-        body_useful = body is not None and body.strip() != "" and body.strip() != "{}"
-        if body_useful: body = body.split("\n")
-        result = self._create_column(type_id, column_name, source_name, model, body if body_useful else [], force)
-        if result[1] == 201 and body_useful:
+    def semantic_types_columns_post_put(self, type_id, column_name, source_name, model, data=[], force=False):
+        """
+        Create a column in a semantic type, optionally with data.
+
+        :param type_id:     Id of the semantic type to create the column in
+        :param column_name: The name of the column to be created
+        :param source_name: The name of the source of the column to be created
+        :param model:       The model of the column to be created
+        :param data:        The (optional) list of data to put into the column on creation
+        :param force:       True if the column should be replaced if it already exists
+        :return: The id of the newly created with a 201 if it was successful, otherwise an error message with the appropriate error code
+        """
+        result = self._create_column(type_id, column_name, source_name, model, data, force)
+        if result[1] == 201 and len(data) > 0:
             att = Attribute(column_name, source_name, type_id)
-            for value in body:
+            for value in data:
                 att.add_value(value)
             att.save(INDEX_NAME)
         return result
 
 
-    def semantic_types_columns_delete(self, type_id, column_ids, column_names, source_names, models):
-        #### Delete the columns
+    def semantic_types_columns_delete(self, type_id, column_ids=None, column_names=None, source_names=None, models=None):
+        """
+        Delete all of the columns in a semantic type that match the given parameters.
+
+        :param type_id:      The id of the semantic type to delete the columns from
+        :param column_ids:   The possible ids of the columns to delete
+        :param source_names: The possible names of the columns to delete
+        :param column_names: The possible source names of the columns to delete
+        :param models:       The possible models of the columns to delete
+        :return: The number of columns deteled with a 200 if successful, otherwise an error message with an appropriate error code
+        """
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
@@ -306,14 +370,19 @@ class Server(object):
     ################ SemanticTypesColumnData ################
 
     def semantic_types_column_data_get(self, column_id):
-        #### Get the column
+        """
+        Returns all of the data in the column
+
+        :param column_id: Id of the column to get the data from
+        :return: The column and all of its info
+        """
         result = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}))
         if len(result) < 1: return "No column with that id was found", 404
         if len(result) > 1: return "More than one column was found with that id", 500
         return json_response(clean_column_output(result[0]), 200)
 
 
-    def semantic_types_column_data_post_put(self, column_id, body, force):
+    def semantic_types_column_data_post_put(self, column_id, body, force=False):
         """
         Add or replace data on an existing column
 
@@ -324,7 +393,6 @@ class Server(object):
         :param force:     True if the current data in the column should be replaced, false if the new data should just be appended
         :return: A conformation with a 201 if it was added successfully or an error message with an appropriate error code if it was not successful
         """
-
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if force else "$pushAll": {DATA: body}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
@@ -340,7 +408,12 @@ class Server(object):
 
 
     def semantic_types_column_data_delete(self, column_id):
-        #### Delete the data
+        """
+        Delete the data from the column with the given id
+
+        :param column_id: Id of the column to delete the data from
+        :return: A deletion conformation with a 200 if successful, otherwise an error message with an appropriate error code
+        """
         result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set": {DATA: []}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
@@ -351,8 +424,17 @@ class Server(object):
 
     ################ BulkAddModels ################
 
-    def bulk_add_models_get(self, model_ids, model_names, model_desc, show_all, crunch_data):
-        #### Find the model
+    def bulk_add_models_get(self, model_ids=None, model_names=None, model_desc=None, show_all=False, crunch_data=True):
+        """
+        Returns the current state of all of the bulk add models.
+
+        :param model_ids:   The possible ids of the models to get
+        :param model_names: The possible names of the models to get
+        :param model_desc:  The possible descriptions of the models to get
+        :param show_all:    True if the whole model should be returned
+        :param crunch_data: False if learnedSemanticTypes should not be generated and the version in the db should be used instead, note that the data in the db is updated every time a get is run with crunch_data=true
+        :return: All of the models that fit the given parameters
+        """
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
         if model_ids is not None: db_body[ID] = {"$in": model_ids}
         if model_names is not None: db_body[NAME] = {"$in": model_names}
@@ -372,9 +454,15 @@ class Server(object):
         return json_response(return_body, 200)
 
 
-    def bulk_add_models_post(self, column_model, body):
+    def bulk_add_models_post(self, model, column_model=DEFAULT_BULK_MODEL):
+        """
+        Add a bulk add model.
+
+        :param column_model: The model that all of the created columns should have
+        :param model:        A dictionary of the model
+        :return: Stats of the data added
+        """
         #### Assert the required elements exist
-        model = json.loads(body)
         if BAC_ID not in model: return "The given model must have an id", 400
         if BAC_NAME not in model: return "The given model must have a name", 400
         if BAC_DESC not in model: return "The given model must have a description", 400
@@ -410,8 +498,15 @@ class Server(object):
                str(existed_column_count) + " columns already existed.", 201
 
 
-    def bulk_add_models_delete(self, model_ids, model_names, model_desc):
-        #### Delete the model
+    def bulk_add_models_delete(self, model_ids=None, model_names=None, model_desc=None):
+        """
+        Delete all of the bulk add models which fit the given parameters
+
+        :param model_ids:   The possible ids of the models to delete
+        :param model_names: The possible names of the models to delete
+        :param model_desc:  The possible descriptions of the models to delete
+        :return: The amount of models deleted with a 200 if successful, otherwise an error message with the appropriate code
+        """
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
         if model_ids is not None: db_body[ID] = {"$in": model_ids}
         if model_names is not None: db_body[NAME] = {"$in": model_names}
@@ -425,7 +520,13 @@ class Server(object):
     ################ BulkAddModelData ################
 
     def bulk_add_model_data_get(self, model_id, crunch_data):
-        #### Get the model
+        """
+        Returns the current state of the bulk add model
+
+        :param model_id:    The id of the model to get
+        :param crunch_data: False if learnedSemanticTypes should not be generated and the version in the db should be used instead, note that the data in the db is updated every time a get is run with crunch_data=true
+        :return: The current state of the bulk add model
+        """
         db_result = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
         if len(db_result) < 1: return "A model was not found with the given id", 404
         if len(db_result) > 1: return "More than one model was found with the given id", 500
@@ -433,17 +534,20 @@ class Server(object):
         return json_response(self._update_bulk_add_model(db_result[BULK_ADD_MODEL_DATA], db_result[MODEL]) if crunch_data else db_result[BULK_ADD_MODEL_DATA], 200)
 
 
-    def bulk_add_model_data_post(self, model_id, column_model, body):
-        #### Process the data
+    def bulk_add_model_data_post(self, model_id, column_model, data):
+        """
+        Add data to the service with a bulk add model
+
+        :param model_id:     The id of the model to add off of
+        :param column_model: The model of the columns being used with that model
+        :param data:         The list of dictionaries with all of the data to add
+        :return: A conformation message with a 201 if it was successful, otherwise an error message with the appropriate code
+        """
         # Get the model and parse the json lines
         model = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
         if len(model) < 1: return "The given model was not found", 404
         if len(model) > 1: return "More than one model was found with the id", 500
         model = model[0][BULK_ADD_MODEL_DATA]
-        data = []
-        for line in body.split("\n"):
-            if line.strip() != "":
-                data.append(json.loads(line))
         # Get all of the data in each column
         for n in model[BAC_GRAPH][BAC_NODES]:
             column_data = []

@@ -285,7 +285,7 @@ class Predict(Resource):
             models = args.pop(MODEL).split(",") if args.get(MODEL) else None
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_names is None: column_names = [DEFAULT_NAME]
-            return service.predict_post(namespaces, column_names, source_names, models, request.data)
+            return service.predict_post(request.data.split(","), namespaces, column_names, source_names, models)
         except:
             return str(traceback.format_exc()), 500
 
@@ -447,7 +447,7 @@ class SemanticTypes(Resource):
             models = args.pop(MODELS).split(",") if args.get(MODELS) else None
             delete_all = args.pop(DELETE_ALL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            return service.semantic_types_delete(class_, property_, type_ids, namespaces, source_names, column_names, column_ids, models, delete_all)
+            return service.semantic_types_delete(class_, property_, type_ids, namespaces, source_names, column_names, column_ids, models, delete_all and delete_all.lower() == "true")
         except:
             return str(traceback.format_exc()), 500
 
@@ -526,7 +526,8 @@ class SemanticTypeColumns(Resource):
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
             if model is None: model = DEFAULT_MODEL
-            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, request.data, False)
+            data = request.data.split("\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" else []
+            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, data, False)
         except:
             return str(traceback.format_exc()), 500
 
@@ -555,7 +556,8 @@ class SemanticTypeColumns(Resource):
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
             if model is None: model = DEFAULT_MODEL
-            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, request.data, True)
+            data = request.data.split("\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" else []
+            return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, data, False)
         except:
             return str(traceback.format_exc()), 500
 
@@ -746,7 +748,7 @@ class BulkAddModels(Resource):
             column_model = args.pop(MODEL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_model is None: column_model = DEFAULT_BULK_MODEL
-            return service.bulk_add_models_post(column_model, request.data)
+            return service.bulk_add_models_post(json.loads(request.data), column_model)
         except:
             return str(traceback.format_exc()), 500
 
@@ -819,7 +821,11 @@ class BulkAddModelData(Resource):
             column_model = args.pop(MODEL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_model is None: column_model = DEFAULT_BULK_MODEL
-            return service.bulk_add_model_data_post(model_id, column_model, request.data)
+            data = []
+            for line in request.data.split("\n"):
+                if line.strip() != "":
+                    data.append(json.loads(line))
+            return service.bulk_add_model_data_post(model_id, column_model, data)
         except:
             return str(traceback.format_exc()), 500
 
