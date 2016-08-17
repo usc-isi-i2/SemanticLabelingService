@@ -90,5 +90,5 @@ __POST__ Add bulk amounts of data to the service.  This adds all of the data to 
 
 
 ###Swagger
-To view documentation for each of the endpoints and try it out with data, go to [http://petstore.swagger.io/](http://petstore.swagger.io/) and paste `http://localhost:5000/api/spec.json` into the address bar the top of the page and click explore.  For some reason it always starts with all of the endpoints hidden, so don't forget to click on "Show/Hide" or "List Operations".  Here is approximately what it should look like after listing all of the endpoints:
+To view documentation for each of the endpoints and try it out with data, go to  `http://localhost:5000/api/spec.html#!/spec`.  For some reason it always starts with all of the endpoints hidden, so don't forget to click on "Show/Hide" or "List Operations".  Here is approximately what it should look like after listing all of the endpoints:
 <center><img src="readme_data/overview.png" alt="Data Structure" style="width: 85%"/></center>
