@@ -1,9 +1,8 @@
 from pymongo import MongoClient
-
 from pyspark import SparkContext
-from utils.relation_tests import greater, less, equal, contains
+
 from utils.similarity_tests import ks_distribution_sim, mw_histogram_sim, jaccard_num_sim, jaccard_str_sim, \
-    jaccard_name_sim, euclid_dist_sim
+    jaccard_name_sim
 
 sc = SparkContext()
 client = MongoClient()
@@ -34,9 +33,8 @@ EQUAL = "equal"
 CONTAIN_IN = "contain_in"
 
 similarity_test_map = {KS_NUM: ks_distribution_sim, MW_HIST: mw_histogram_sim, JC_NUM: jaccard_num_sim,
-                       JC_TEXT: jaccard_str_sim, JC_NAME: jaccard_name_sim, EL_DIST: euclid_dist_sim}
+                       JC_TEXT: jaccard_str_sim, JC_NAME: jaccard_name_sim}
 
-relation_test_map = {GREATER: greater, LESS: less, EQUAL: equal, CONTAIN_IN: contains}
 
 features = [JC_TEXT, JC_NUM, TF_TEXT, KS_NUM, MW_HIST, JC_NAME]
 relations = [GREATER, LESS, EQUAL, CONTAIN_IN]

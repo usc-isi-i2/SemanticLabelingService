@@ -1,5 +1,3 @@
-from numpy import linalg
-from scipy.spatial.distance import euclidean
 from scipy.stats import ks_2samp, mannwhitneyu
 
 from utils.helpers import adjust_result

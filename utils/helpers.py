@@ -28,6 +28,7 @@ def read_extractions(folder_path, dest_folder):
                                 with open(file_path, "r") as reader:
                                     writer.write(reader.read())
 
+
 if __name__ == "__main__":
     pass
     # read_extractions("/Users/minhpham/projects/dig-data/sample-datasets/escorts", "raw_data/test-memex")

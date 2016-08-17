@@ -150,10 +150,10 @@ class DataSource:
 
 
 class Attribute:
-    def __init__(self, name, source_name):
+    def __init__(self, name, source_name, semantic_type=None):
         self.name = name
         self.source_name = source_name
-        self.semantic_type = None
+        self.semantic_type = semantic_type
 
         self.text = ""
 
@@ -208,7 +208,7 @@ class Attribute:
         feature_vectors = compute_feature_vectors(labeled_attrs_map, self.to_json(), tf_idf_map)
         return feature_vectors
 
-    def predict_type(self, set_name, labeled_sources, labeled_attrs_map, classifier):
+    def predict_type(self, set_name, labeled_sources, labeled_attrs_map, classifier, confidence_threshold=0.2):
         feature_vectors = self.compute_features(set_name, labeled_sources, labeled_attrs_map)
         predictions = classifier.predict(feature_vectors)
 
@@ -228,7 +228,7 @@ class Attribute:
         final_predictions = []
 
         for prediction in predictions:
-            if prediction["semantic_type"] in semantic_type_set:
+            if prediction["semantic_type"] in semantic_type_set or prediction["prob"] < confidence_threshold:
                 continue
             else:
                 semantic_type_set.add(prediction["semantic_type"])
@@ -262,5 +262,3 @@ class Attribute:
             if max(self.frequency_list) > 50:
                 self.frequency_list = []
             self.text = " ".join(self.value_list)
-
-

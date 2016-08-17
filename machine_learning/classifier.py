@@ -1,9 +1,10 @@
+import os
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.externals import joblib
 from sklearn.linear_model import LogisticRegression
-import os
 
 from semantic_labeling import features, DEBUG
 

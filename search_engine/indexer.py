@@ -1,7 +1,7 @@
 from elasticsearch.helpers import scan, bulk
 
 from search_engine import es
-from semantic_labeling import data_collection, relation_collection, TF_TEXT, coop_collection
+from semantic_labeling import data_collection, TF_TEXT
 
 
 class Indexer:
