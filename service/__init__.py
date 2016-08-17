@@ -1,8 +1,8 @@
 import base64
 import collections
 import json
-from flask import Response
 
+from flask import Response
 
 ######## General Constants #########
 NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'  # Characters not allowed by elastic search

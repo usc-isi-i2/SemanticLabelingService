@@ -1,7 +1,5 @@
-from elasticsearch.helpers import scan
-
 from search_engine import es
-from semantic_labeling import TF_TEXT, data_collection, relation_collection
+from semantic_labeling import TF_TEXT, data_collection
 
 
 class Searcher:
@@ -9,34 +7,21 @@ class Searcher:
         pass
 
     @staticmethod
-    def search_columns_data(index_name, source_names):
-        # result = list(scan(es, index=index_name, doc_type=','.join(source_names),
-        #                    query={"query": {"match_all": {}}}))
-        result = list(data_collection.find({"set_name": index_name, "source_name": {"$in": source_names}}, {"_id": 0}))
+    def search_attribute_data(set_name, source_names):
+        result = list(data_collection.find({"set_name": set_name, "source_name": {"$in": source_names}}, {"_id": 0}))
         return result
 
     @staticmethod
-    def search_column_data_by_name(column_name, index_name, source_name):
+    def search_attribute_data_by_name(column_name, index_name, source_name):
         result = data_collection.find_one(
             {"set_name": index_name, "source_name": source_name, "name": column_name, "value_list": {"$exists": True}},
             {"_id": 0})
         return result
 
     @staticmethod
-    def search_relations_data(type1, type2, relation):
-        result = relation_collection.find_one({"type1": type1, "type2": type2, "relation": relation}, {"_id": 0})
-        return result
-
-    @staticmethod
-    def get_relation_score(type1, type2, relation):
-        result = Searcher.search_relations_data(type1, type2, relation)
-        score = result["true_count"] * 1.0 / result["total_count"]
-        return score
-
-    @staticmethod
-    def search_similar_text_data(index_name, text, source_names):
+    def search_similar_text_data(set_name, text, source_names):
         try:
-            result = es.search(index=index_name, doc_type=','.join(source_names),
+            result = es.search(index=set_name, doc_type=','.join(source_names),
                                body={
                                    "query": {
                                        "match": {
@@ -52,4 +37,4 @@ class Searcher:
 
     @staticmethod
     def search_types_data(index_name, source_names):
-        return Searcher.search_columns_data(index_name, source_names)
+        return Searcher.search_attribute_data(index_name, source_names)

@@ -8,7 +8,6 @@ class Server(object):
     def __init__(self):
         self.db = MongoClient().data.posts
 
-
     ################ Stuff for use in this file ################
 
     def _create_semantic_type(self, class_, property_, force=False):
@@ -22,7 +21,8 @@ class Server(object):
 
         # Actually add the type
         type_id = get_type_id(class_, property_)
-        db_body = {ID: type_id, DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, CLASS: class_, PROPERTY: property_, NAMESPACE: namespace}
+        db_body = {ID: type_id, DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, CLASS: class_, PROPERTY: property_,
+                   NAMESPACE: namespace}
         if force:
             self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id})
             self.db.delete_many(db_body)
@@ -32,10 +32,10 @@ class Server(object):
         self.db.insert_one(db_body)
         return type_id, 201
 
-
     def _create_column(self, type_id, column_name, source_name, model, data=[], force=False):
         column_id = get_column_id(type_id, column_name, source_name, model)
-        db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id, COLUMN_NAME: column_name, SOURCE_NAME: source_name, MODEL: model, DATA: data}
+        db_body = {ID: column_id, DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: type_id, COLUMN_NAME: column_name,
+                   SOURCE_NAME: source_name, MODEL: model, DATA: data}
         if force:
             self.db.delete_many(db_body)
         else:
@@ -44,13 +44,12 @@ class Server(object):
         self.db.insert_one(db_body)
         return column_id, 201
 
-
     def _add_data_to_column(self, column_id, body, replace=False):
-        result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id}, {"$set" if replace else "$pushAll": {DATA: body}})
+        result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id},
+                                     {"$set" if replace else "$pushAll": {DATA: body}})
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         return "Column data updated", 201
-
 
     ################ Predict ################
 
@@ -68,7 +67,6 @@ class Server(object):
 
         #### Predict the types
         return "Method partially implemented", 601
-
 
     ################ SemanticTypes ################
 
@@ -133,7 +131,6 @@ class Server(object):
         if len(return_body) < 1: return "No Semantic types matching the given parameters were found", 404
         return json_response(return_body, 200)
 
-
     def semantic_types_post(self, args):
         #### Assert args are valid
         args = args.copy()
@@ -147,7 +144,6 @@ class Server(object):
         #### Add the type
         return self._create_semantic_type(class_, property_)
 
-
     def semantic_types_put(self, args):
         #### Assert args are valid
         args = args.copy()
@@ -160,7 +156,6 @@ class Server(object):
 
         #### Add the type
         return self._create_semantic_type(class_, property_, True)
-
 
     def semantic_types_delete(self, args):
         #### Assert args are valid
@@ -178,7 +173,8 @@ class Server(object):
 
         #### Delete the types
         if delete_all and delete_all.lower() == "true":
-            return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE, DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
+            return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE,
+                                                                         DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
         # Find the parent semantic types and everything below them of everything which meets column requirements
         type_ids_to_delete = []
@@ -206,11 +202,11 @@ class Server(object):
             for id_ in type_ids_to_delete:
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
-            deleted = self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}).deleted_count
+            deleted = self.db.delete_many(
+                {DATA_TYPE: DATA_TYPE_COLUMN, TYPEID: {"$in": type_ids_to_delete}}).deleted_count
             self.db.delete_many({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}})
 
         return deleted + " semantic types matched parameters and were deleted", 200
-
 
     ################ SemanticTypesColumns ################
 
@@ -238,7 +234,6 @@ class Server(object):
         if len(list(result)) < 1: return "No columns matching the given parameters were found", 404
         return json_response(clean_columns_output(result, return_column_data), 200)
 
-
     def semantic_types_columns_post(self, type_id, args, body):
         #### Assert args are valid
         if type_id is None or len(type_id) < 1:
@@ -255,8 +250,8 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
-
+        return self._create_column(type_id, column_name, source_name, model, body.split(
+            "\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
 
     def semantic_types_columns_put(self, type_id, args, body):
         #### Assert args are valid
@@ -274,8 +269,8 @@ class Server(object):
             model = "default"
 
         #### Add the column
-        return self._create_column(type_id, column_name, source_name, model, body.split("\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
-
+        return self._create_column(type_id, column_name, source_name, model, body.split(
+            "\n") if body is not None and body.strip() != "" and body.strip() != "{}" else [])
 
     def semantic_types_columns_delete(self, type_id, args):
         #### Assert args are valid
@@ -300,7 +295,6 @@ class Server(object):
         if deleted_count < 1: return "No columns were found with the given parameters", 404
         return str(deleted_count) + " columns deleted successfully", 200
 
-
     ################ SemanticTypesColumnData ################
 
     def semantic_types_column_data_get(self, column_id, args):
@@ -316,7 +310,6 @@ class Server(object):
         if len(result) > 1: return "More than one column was found with that id", 500
         return json_response(clean_column_output(result[0]), 200)
 
-
     def semantic_types_column_data_post(self, column_id, args, body):
         #### Assert args are valid
         if body is None or body == "":
@@ -328,7 +321,6 @@ class Server(object):
 
         #### Add the data
         return self._add_data_to_column(column_id, body.split("\n"))
-
 
     def semantic_types_column_data_put(self, column_id, args, body):
         #### Assert args are valid
@@ -342,7 +334,6 @@ class Server(object):
         #### Replace the data
         return self._add_data_to_column(column_id, body.split("\n"), True)
 
-
     def semantic_types_column_data_delete(self, column_id, args):
         #### Assert args are valid
         if column_id is None or len(column_id) < 1:
@@ -355,7 +346,6 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         return "Column data deleted", 200
-
 
     ################ BulkAddModels ################
 
@@ -391,7 +381,6 @@ class Server(object):
             return_body.append(o)
         return json_response(return_body, 601)
 
-
     def bulk_add_models_post(self, args, body):
         #### Assert args are valid
         if body is None or len(body) < 1:
@@ -420,23 +409,33 @@ class Server(object):
             if n.get("userSemanticTypes"):
                 for ust in n["userSemanticTypes"]:
                     semantic_status = self._create_semantic_type(ust["domain"]["uri"], ust["type"]["uri"])
-                    if semantic_status[1] == 201: new_type_count += 1
-                    elif semantic_status[1] == 409: existed_type_count += 1
-                    elif semantic_status[1] == 400: return semantic_status
-                    else: return "Error occurred while adding semantic type: " + str(ust), 500
-                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model)
-                    if column_status[1] == 201: new_column_count += 1
-                    elif column_status[1] == 409: existed_column_count += 1
-                    elif column_status[1] == 400: return column_status
-                    else: return "Error occurred while adding column for semantic type: " + str(ust), 500
+                    if semantic_status[1] == 201:
+                        new_type_count += 1
+                    elif semantic_status[1] == 409:
+                        existed_type_count += 1
+                    elif semantic_status[1] == 400:
+                        return semantic_status
+                    else:
+                        return "Error occurred while adding semantic type: " + str(ust), 500
+                    column_status = self._create_column(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]),
+                                                        n["columnName"], model["name"], column_model)
+                    if column_status[1] == 201:
+                        new_column_count += 1
+                    elif column_status[1] == 409:
+                        existed_column_count += 1
+                    elif column_status[1] == 400:
+                        return column_status
+                    else:
+                        return "Error occurred while adding column for semantic type: " + str(ust), 500
 
         # Nothing bad happened when creating the semantic types and columns, so add the model to the DB
-        self.db.insert_one({DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"], BULK_ADD_MODEL_DATA: model})
+        self.db.insert_one(
+            {DATA_TYPE: DATA_TYPE_MODEL, ID: model["id"], NAME: model["name"], DESC: model["description"],
+             BULK_ADD_MODEL_DATA: model})
         return "Model and columns added, " + str(new_type_count) + " semantic types created, " + \
                str(existed_type_count) + " semantic types already existed, " + \
                str(new_column_count) + " columns created, and " + \
                str(existed_column_count) + " columns already existed.", 201
-
 
     def bulk_add_models_delete(self, args):
         #### Assert args are valid
@@ -459,7 +458,6 @@ class Server(object):
         if deleted_count < 1: return "No models were found with the given parameters", 404
         return str(deleted_count) + " models deleted successfully", 200
 
-
     ################ BulkAddModelData ################
 
     def bulk_add_model_data_get(self, model_id, args):
@@ -475,7 +473,6 @@ class Server(object):
         db_result = db_result[0]
         # TODO: possibly update the learned semantic types here
         return json_response(db_result[BULK_ADD_MODEL_DATA], 601)
-
 
     def bulk_add_model_data_post(self, model_id, args, body):
         if model_id is None or len(model_id) < 1:
@@ -506,9 +503,14 @@ class Server(object):
             # Add it to the db
             if n.get("userSemanticTypes"):
                 for ust in n["userSemanticTypes"]:
-                    result = self._add_data_to_column(get_column_id(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"], model["name"], column_model), column_data)[1]
-                    if result == 201: continue
-                    elif result == 404: return "A required column was not found", 404
-                    else: return "Error occurred while adding data to the column", 500
+                    result = self._add_data_to_column(
+                        get_column_id(get_type_id(ust["domain"]["uri"], ust["type"]["uri"]), n["columnName"],
+                                      model["name"], column_model), column_data)[1]
+                    if result == 201:
+                        continue
+                    elif result == 404:
+                        return "A required column was not found", 404
+                    else:
+                        return "Error occurred while adding data to the column", 500
 
         return "Data successfully added to columns", 201

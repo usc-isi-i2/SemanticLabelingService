@@ -20,6 +20,7 @@ class Classifier(object):
             train_data += data
         train_data = pd.DataFrame(train_data)
         train_data = train_data.replace([np.inf, -np.inf, np.nan], 0)
+        train_data = train_data.drop_duplicates()
         train_data.to_csv("train.csv", mode='w', header=True)
 
         self.model.fit(train_data[features], train_data["target"])

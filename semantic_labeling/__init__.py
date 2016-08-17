@@ -13,6 +13,7 @@ DEBUG = False
 
 data_collection = db["data"]
 relation_collection = db["relation"]
+coop_collection = db["coop"]
 
 debug_writer = open('debug.txt', 'w')
 
@@ -37,5 +38,5 @@ similarity_test_map = {KS_NUM: ks_distribution_sim, MW_HIST: mw_histogram_sim, J
 
 relation_test_map = {GREATER: greater, LESS: less, EQUAL: equal, CONTAIN_IN: contains}
 
-features = [JC_TEXT, JC_NUM, TF_TEXT, KS_NUM, MW_HIST]
+features = [JC_TEXT, JC_NUM, TF_TEXT, KS_NUM, MW_HIST, JC_NAME]
 relations = [GREATER, LESS, EQUAL, CONTAIN_IN]

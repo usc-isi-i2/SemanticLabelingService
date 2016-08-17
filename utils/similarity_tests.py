@@ -18,21 +18,9 @@ def mw_histogram_sim(list1, list2, num_fraction1, num_fraction2):
 
 
 def jaccard_name_sim(str1, str2, num_fraction1, num_fraction2):
-    tokens1 = [str1[i:i + 2] for i in range(len(str1.lower()) - 1)]
-    tokens2 = [str2[i:i + 2] for i in range(len(str2.lower()) - 1)]
+    tokens1 = [str1[i:i + 2] for i in range(len(str1.lower()))]
+    tokens2 = [str2[i:i + 2] for i in range(len(str2.lower()))]
     return jaccard_similarity(tokens1, tokens2)
-
-
-def euclid_dist_sim(list1, list2, num_fraction1, num_fraction2):
-    if not list1 or not list2:
-        return 0
-    if len(list1) > len(list2):
-        list1 = list1[:len(list2)]
-    else:
-        list2 = list2[:len(list1)]
-    result = euclidean(list1, list2) / (linalg.norm(list1) + linalg.norm(list2))
-    # print result
-    return adjust_result(num_fraction1, num_fraction2, result)
 
 
 def jaccard_str_sim(list1, list2, num_fraction1, num_fraction2):

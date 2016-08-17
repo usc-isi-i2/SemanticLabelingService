@@ -1,4 +1,5 @@
 import traceback
+
 from flask import Flask, request
 from flask_cors import CORS
 from flask_restful import Api, Resource
@@ -6,7 +7,6 @@ from flask_restful_swagger import swagger
 
 import config
 import service.serverLogic
-
 
 app = Flask(__name__, static_folder='../static')
 api = swagger.docs(Api(app), apiVersion='0.2', basePath='/', resourcePath='/', produces=["application/json", "text/html"], api_spec_url='/api/spec', description='Semantic Typing')

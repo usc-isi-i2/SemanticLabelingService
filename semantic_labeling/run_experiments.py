@@ -1,5 +1,3 @@
-import random
-
 from data_source.data_source import DataSet
 from machine_learning.classifier import Regression, RandomForest
 
@@ -25,7 +23,7 @@ class SemanticLabeler:
             data_set.read("data/%s" % name)
             self.data_set_map[name] = data_set
 
-    def test_semantic_typing1(self, labeling_sets):
+    def test_semantic_typing(self, labeling_sets):
         with open("result.txt", "a") as f:
             for name in labeling_sets:
                 sizes = labeling_sets[name]
@@ -33,17 +31,9 @@ class SemanticLabeler:
                 f.write(name + "\t")
                 f.write(str(data_set.test(sizes, self.classifier)) + "\n")
 
-    def test_semantic_typing2(self, labeled_set, labeling_set):
-        labeled_sources = self.data_set_map[labeled_set].source_map.keys()
-        data_set = self.data_set_map[labeling_set]
-        data_set.predict_with_different_set(self.classifier, labeled_set, labeled_sources)
-
 
 if __name__ == "__main__":
     labeler = SemanticLabeler("LOGISTIC")
-    labeler.store_data_sets(["weather2"])
-    # sizes = random.sample(range([1, 2, 3, 4, 5]), 2)
-    # labeler.train_classifier({"soccer2": [1]})
-    # labeler.test_semantic_typing1(
-    #     {"weather2": [1]})
-    # , "museum2": [1, 2, 3, 4, 5, 14], "weather_old2": [1, 2, 3], "soccer2": [1, 2, 3, 4, 5]
+    labeler.store_data_sets(["museum2", "soccer2"])
+    labeler.train_classifier({"soccer2": [1]})
+    labeler.test_semantic_typing({"soccer2": [10]})

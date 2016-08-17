@@ -1,19 +1,14 @@
 import csv
+import itertools
 import locale
+import math
+import operator
 import os
 from collections import Counter, defaultdict
 
-import math
-
-import itertools
-
-import re
-from string import digits
-
 from search_engine.indexer import Indexer
 from search_engine.searcher import Searcher
-from semantic_labeling import KS_NUM, JC_NUM, JC_TEXT, MW_HIST, JC_NAME, TF_TEXT, debug_writer, JC_FULL_TEXT, KS_FRAC, \
-    KS_LENGTH, EL_DIST, relations, relation_test_map
+from semantic_labeling import KS_NUM, JC_NUM, JC_TEXT, MW_HIST, JC_NAME, TF_TEXT, debug_writer, EL_DIST
 from semantic_labeling.feature_computing import compute_feature_vectors
 from utils.helpers import split_number_text
 
@@ -36,7 +31,7 @@ class DataSet:
             self.source_map[source.name] = source
 
     def is_saved(self):
-        return Indexer.check_index_exists(self.name)
+        return Indexer.check_set_indexed(self.name)
 
     def save(self):
         for source in self.source_map.values():
@@ -51,47 +46,58 @@ class DataSet:
                 source = self.source_map[key]
                 labeled_sources, labeled_attrs_map = self.get_labeled_sources(idx, size)
                 print key, labeled_sources
-                prediction_map = source.label(labeled_attrs_map, classifier, labeled_sources)
-                prediction_map = source.align_semantic_types(prediction_map)
+                prediction_map = source.label(self.name, labeled_attrs_map, classifier, labeled_sources)
                 for attr_name in prediction_map:
-                    attr = source.column_map[attr_name]
+                    find = False
+                    attr = source.attr_map[attr_name]
                     rank = 0
                     count += 1
-                    for obj in prediction_map[attr_name]:
+                    result = defaultdict(lambda: [])
+                    for obj in sorted(prediction_map[attr_name].items(), key=operator.itemgetter(1), reverse=True):
+                        result[round(obj[1], 2)].append(obj[0])
+                    for obj in sorted(result.items(), key=operator.itemgetter(0), reverse=True):
                         rank += 1
                         debug_writer.write(source.name + "\t" +
-                                           attr.name + "\t" + attr.semantic_type + "\t" + str(prediction) + "\n")
-                        if obj["semantic_type"] == attr.semantic_type:
+                                           attr.name + "\t" + attr.semantic_type + "\t" + str(obj) + "\n")
+                        if attr.semantic_type in obj[1]:
+                            find = True
                             break
-                    score += 1.0 / rank
+                    if find:
+                        score += 1.0 / rank
                     debug_writer.write(str(score) + "\n")
             mrr_scores[size] = score * 1.0 / count
         return mrr_scores
 
-    def predict_with_different_set(self, classifier, set_name, labeled_sources):
-        semantic_type_map = defaultdict(lambda: {})
-        for source in self.source_map.values():
-            labeled_attrs_map = Searcher.search_columns_data(set_name, labeled_sources)
-            for attr in source.attr_map.values():
-                if attr.semantic_type and attr.value_list:
-                    prediction = attr.predict_type(self.name, labeled_sources, labeled_attrs_map, classifier)[0]
-                    semantic_type_map[source.name][attr.semantic_type] = prediction["semantic_type"]
-        for file_name in os.listdir(self.folder_path):
-            file_path = os.path.join(self.folder_path, file_name)
-            source_name = os.path.splitext(file_name)[0]
-            with open(file_path, 'r') as f:
-                lines = f.readlines()
-                for key in semantic_type_map[source_name].keys():
-                    lines[0] = lines[0].replace('"%s"' % str(key).translate(None, digits),
-                                                semantic_type_map[source_name][key])
-            with open(file_path, "w") as f:
-                for line in lines:
-                    f.write(line)
+    def test_with_different_set(self, classifier, set_name, labeled_sources):
+        score = 0
+        count = 0
+        labeled_attrs_map = Searcher.search_attribute_data(set_name, labeled_sources)
+        for idx, key in enumerate(sorted(self.source_map.keys())):
+            source = self.source_map[key]
+            prediction_map = source.label(self.name, labeled_attrs_map, classifier, labeled_sources)
+            print source.resolve_coocurence(prediction_map, self.name, labeled_sources)
+            for attr_name in prediction_map:
+                find = False
+                attr = source.attr_map[attr_name]
+                rank = 0
+                count += 1
+                for obj in prediction_map[attr_name]:
+                    rank += 1
+                    debug_writer.write(source.name + "\t" +
+                                       attr.name + "\t" + attr.semantic_type + "\t" + str(obj) + "\n")
+                    if obj["semantic_type"] == attr.semantic_type:
+                        find = True
+                        break
+                if find:
+                    score += 1.0 / rank
+                debug_writer.write(str(score) + "\n")
+        mrr_score = score * 1.0 / count
+        return mrr_score
 
-    def get_labeled_sources(self, idx=0, size=0, ):
+    def get_labeled_sources(self, idx=0, size=0):
         double_list = sorted(self.source_map.keys()) * 2
         labeled_sources = double_list[idx + 1: idx + size + 1]
-        labeled_attrs_map = Searcher.search_columns_data(self.name, labeled_sources)
+        labeled_attrs_map = Searcher.search_attribute_data(self.name, labeled_sources)
         return labeled_sources, labeled_attrs_map
 
     def generate_training_data(self, size_list):
@@ -125,66 +131,22 @@ class DataSource:
                         self.attr_map[attr_name].semantic_type = row[attr_name]
                     type_row = False
                 else:
-                    entity = Entity()
                     for attr_name in reader.fieldnames:
-                        entity.add_attribute(attr_name, row[attr_name])
                         self.attr_map[attr_name].add_value(row[attr_name])
-                    self.entity_list.append(entity)
 
-    def save(self, index_name):
-        self.learn_relation(True)
+    def save(self, set_name):
         for attr in self.attr_map.values():
             if attr.semantic_type and attr.value_list:
-                attr.save(index_name)
+                attr.save(set_name)
 
-    def label(self, labeled_attrs_map, classifier, labeled_sources):
-        result = {}
+    def label(self, set_name, labeled_attrs_map, classifier, labeled_sources):
+        result = defaultdict(lambda: {})
         for attr in self.attr_map.values():
-            if attr.semantic_type:
-                tf_idf_map = Searcher.search_similar_text_data(self.name, attr.text, labeled_sources)
-                prediction = attr.predict_type(labeled_attrs_map, tf_idf_map, classifier)
-                result[attr.name] = prediction
+            if attr.semantic_type and attr.value_list:
+                prediction = attr.predict_type(set_name, labeled_sources, labeled_attrs_map, classifier)
+                for semantic_type in prediction:
+                    result[attr.name][semantic_type["semantic_type"]] = semantic_type["prob"]
         return result
-
-    def align_semantic_types(self, prediction_map):
-        prediction_map = sorted(prediction_map, key=lambda x: (-len(x), x[0]["prob"] - x[1]["prob"], x[0]["prob"]),
-                                reverse=True)
-
-        relation_map = self.learn_relation()
-
-        for key in relation_map.keys():
-            for idx1, obj1 in enumerate(prediction_map[key[0]]):
-                for idx2, obj2 in enumerate(prediction_map[key[1]]):
-                    relation_score = Searcher.get_relation_score(obj1["semantic_type"], obj2["semantic_type"],
-                                                                 relation_map[key])
-                    prediction_map[key[0]][idx1]["prob"] += (relation_score - 0.5)
-                    prediction_map[key[1]][idx2]["prob"] += (relation_score - 0.5)
-        return prediction_map
-
-    def learn_relation(self, is_saving=False):
-        relation_map = {}
-        for idx, attr1 in enumerate(self.attr_map.values()):
-            for attr2 in self.attr_map.values()[idx + 1:]:
-                for test in relation_test_map.keys():
-                    if relation_test_map[test](attr1.value_list, attr2.value_list):
-                        flag = True
-                        relation_map[(attr1.name, attr2.name)] = test
-                    else:
-                        flag = False
-                        relation_map[(attr1.name, attr2.name)] = None
-                    if is_saving:
-                        Indexer.index_relation(test, attr1.semantic_type, attr2.semantic_type, flag)
-        return relation_map
-
-
-class Entity:
-    def __init__(self, attributes=None):
-        if attributes is None:
-            attributes = {}
-        self.attributes = attributes
-
-    def add_attribute(self, name, value):
-        self.attributes[name] = value
 
 
 class Attribute:
@@ -225,12 +187,10 @@ class Attribute:
 
         if text:
             self.textual_list.append(text)
-            self.text_len += len(text)
-            # self.text_len += 1
+            self.text_len += 1
         if num:
             self.numeric_list.append(max([locale.atof(v[0]) for v in num]))
-            self.num_len += sum([len(n) for n in num])
-            # self.num_len += 1
+            self.num_len += 1
 
         self.value_list.append(value)
 
@@ -242,14 +202,14 @@ class Attribute:
                     EL_DIST: self.numeric_list, JC_NAME: self.name, TF_TEXT: self.text,}
         return json_obj
 
-    def compute_features(self, index_name, labeled_sources, labeled_attrs_map):
+    def compute_features(self, set_name, labeled_sources, labeled_attrs_map):
         self.prepare_data()
-        tf_idf_map = Searcher.search_similar_text_data(index_name, self.text, labeled_sources)
+        tf_idf_map = Searcher.search_similar_text_data(set_name, self.text, labeled_sources)
         feature_vectors = compute_feature_vectors(labeled_attrs_map, self.to_json(), tf_idf_map)
         return feature_vectors
 
-    def predict_type(self, index_name, labeled_sources, labeled_attrs_map, classifier):
-        feature_vectors = self.compute_features(index_name, labeled_sources, labeled_attrs_map)
+    def predict_type(self, set_name, labeled_sources, labeled_attrs_map, classifier):
+        feature_vectors = self.compute_features(set_name, labeled_sources, labeled_attrs_map)
         predictions = classifier.predict(feature_vectors)
 
         predictions = predictions.sort_values(["prob"], ascending=[False])
@@ -265,28 +225,31 @@ class Attribute:
 
         predictions = sorted(predictions, key=lambda x: x["prob"], reverse=True)
 
+        final_predictions = []
+
         for prediction in predictions:
-            if prediction["semantic_type"] in semantic_type_set or prediction["prob"] < 0.5:
-                predictions.remove(prediction)
+            if prediction["semantic_type"] in semantic_type_set:
+                continue
             else:
                 semantic_type_set.add(prediction["semantic_type"])
+                final_predictions.append(prediction)
 
-        return predictions
+        return final_predictions
 
     def save(self, index_name):
-        Indexer.index_column(self, self.source_name, index_name)
+        Indexer.store_attribute(self, self.source_name, index_name)
 
     def update(self, index_name):
-        result = Searcher.search_column_data_by_name(self.name, self.source_name, index_name)
+        result = Searcher.search_attribute_data_by_name(self.name, self.source_name, index_name)
         if result:
             value_list = result["value_list"]
             for value in value_list:
                 self.add_value(value)
-            Indexer.delete_column(self.name, self.source_name, index_name)
-        Indexer.index_column(self, self.source_name, index_name)
+            Indexer.delete_attribute(self.name, self.source_name, index_name)
+        Indexer.store_attribute(self, self.source_name, index_name)
 
     def delete(self, index_name):
-        Indexer.delete_column(self.name, self.source_name, index_name)
+        Indexer.delete_attribute(self.name, self.source_name, index_name)
 
     def prepare_data(self):
         if not self.is_prepared:
@@ -296,22 +259,8 @@ class Attribute:
                 [count * 1.0 / len(self.value_list) for count in Counter(self.value_list).values()])
             self.frequency_list = [[idx] * int(math.ceil(freq * 100)) for idx, freq in enumerate(self.frequency_list)]
             self.frequency_list = list(itertools.chain(*self.frequency_list))
-            # if max(self.frequency_list) > 50:
-            #     self.frequency_list = []
+            if max(self.frequency_list) > 50:
+                self.frequency_list = []
             self.text = " ".join(self.value_list)
 
 
-class TimeSeriesAttribute(Attribute):
-    def __init__(self, *args):
-        super(Attribute, self).__init__(*args)
-
-        self.time_series_list = []
-
-    def add_value(self, value, time):
-        timed_value = (time, value)
-        super(Attribute, self).add_value(value)
-
-        self.time_series_list.append(timed_value)
-
-    def prepare_data(self):
-        super(Attribute, self).prepare_data()
