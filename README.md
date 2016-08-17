@@ -15,7 +15,7 @@ export SPARK_HOME="{{path to spark}}"
 export PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/build:$PYTHONPATH
 export PYTHONPATH=$SPARK_HOME/python/lib/py4j-{{version number}}-src.zip:$PYTHONPATH
 </pre>
-
+* SemanticLabeling - Install using "pip install git+https://github.com/usc-isi-i2/SemanticLabelingAlgorithm.git"
 
 
 ##Running the service

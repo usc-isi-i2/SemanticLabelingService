@@ -1,15 +1,15 @@
 import validators
 from pymongo import MongoClient
+from semantic_labeling.data_source.data_source import Attribute
+from semantic_labeling.machine_learning.classifier import Classifier
+from semantic_labeling.search_engine.searcher import Searcher
 
-from data_source.data_source import Attribute
-from machine_learning.classifier import Classifier
-from search_engine.searcher import Searcher
 from service import *
 
 
 class Server(object):
     def __init__(self):
-        self.db = MongoClient().data.posts
+        self.db = MongoClient().data.service
         self.classifier = Classifier(None)
         self.classifier.load(DATA_MODEL_PATH)
 
