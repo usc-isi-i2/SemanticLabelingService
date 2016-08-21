@@ -54,7 +54,9 @@ class Server(object):
         :return: A list of dictionaries which each contain the semantic type and confidence score
         """
         att = Attribute(column_name, source_names[0])
-        for value in data:
+        print data
+        print data[0].splitlines()
+        for value in data[0].splitlines():
             att.add_value(value)
         return att.predict_type(INDEX_NAME, source_names, Searcher.search_attribute_data(INDEX_NAME, source_names),
                                 self.classifier, CONFIDENCE)
@@ -286,6 +288,7 @@ class Server(object):
         if class_ is not None: db_body[CLASS] = class_
         if property_ is not None: db_body[PROPERTY] = property_
         if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
+        print db_body
         if source_names is None and column_names is None and column_ids is None and models is None:
             deleted = self.db.delete_many(db_body).deleted_count
         else:
@@ -297,6 +300,7 @@ class Server(object):
                     type_ids_to_delete.remove(id_)
             db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: {"$in": type_ids_to_delete}}
             found_columns = list(self.db.find(db_body))
+            print found_columns
             for col in found_columns:
                 Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
             self.db.delete_many(db_body)
