@@ -224,7 +224,7 @@ class Server(object):
         property_ = property_.rstrip("/")
 
         ## Verify that class is a valid uri and namespace is a valid uri
-        namespace = "/".join(class_.split("/")[:-1])
+        namespace = "/".join(class_.replace("#", "/").split("/")[:-1])
         if not validators.url(class_) or not validators.url(namespace): return "Invalid class URI was given", 400
 
         ## Actually add the type
