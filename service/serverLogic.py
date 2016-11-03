@@ -428,6 +428,7 @@ class Server(object):
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         Attribute(column[COLUMN_NAME], column[SOURCE_NAME]).delete(INDEX_NAME)
+        self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         return "Column data deleted", 200
 
     ################ BulkAddModels ################
