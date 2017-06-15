@@ -17,7 +17,7 @@ class Server(object):
     def __init__(self):
         self.db = MongoClient().data.service
         self.classifier = MyRandomForest({}, {}, DATA_MODEL_PATH)
-        self.classifier.load()
+        self.classifier.train([])
 
     ################ Stuff for use in this file ################
 
@@ -434,12 +434,8 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-<<<<<<< HEAD
         Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
-=======
-        Attribute(column[COLUMN_NAME], column[SOURCE_NAME]).delete(INDEX_NAME)
         self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
->>>>>>> d4c9d57265050e8ba69d5cec1a56f8d007991c1e
         return "Column data deleted", 200
 
     ################ BulkAddModels ################
