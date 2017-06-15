@@ -230,7 +230,7 @@ class Server(object):
         property_ = property_.rstrip("/")
 
         ## Verify that class is a valid uri and namespace is a valid uri
-        namespace = "/".join(class_.split("/")[:-1])
+        namespace = "/".join(class_.replace("#", "/").split("/")[:-1])
         if not validators.url(class_) or not validators.url(namespace): return "Invalid class URI was given", 400
 
         ## Actually add the type
@@ -434,7 +434,12 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+<<<<<<< HEAD
         Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+=======
+        Attribute(column[COLUMN_NAME], column[SOURCE_NAME]).delete(INDEX_NAME)
+        self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+>>>>>>> d4c9d57265050e8ba69d5cec1a56f8d007991c1e
         return "Column data deleted", 200
 
     ################ BulkAddModels ################
