@@ -5,7 +5,7 @@ import json
 from flask import Response
 
 ######## General Constants #########
-DATA_MODEL_PATH = "model/Regression.pkl"  # File path for the model used by the semantic labeling
+DATA_MODEL_PATH = "model/lr.pkl"  # File path for the model used by the semantic labeling
 INDEX_NAME = "index_name"  # The index_name for use when saving attributes
 DEFAULT_NAME = "default"  # Just a name for using when there isn't one
 DEFAULT_MODEL = "default"  # Default model name for use when one isn't provided

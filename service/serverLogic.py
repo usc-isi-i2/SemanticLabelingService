@@ -1,17 +1,23 @@
 import validators
+from elasticsearch import Elasticsearch
 from pymongo import MongoClient
-from semantic_labeling.data_source.data_source import Attribute
-from semantic_labeling.machine_learning.classifier import Classifier
-from semantic_labeling.search_engine.searcher import Searcher
+from semantic_labeling.lib.column import Column
+from semantic_labeling.lib.source import Source
+from semantic_labeling.main.random_forest import MyRandomForest
+from semantic_labeling.search.indexer import Indexer
+from semantic_labeling.search.searcher import Searcher
 
 from service import *
 
+elastic_search = Elasticsearch()
+indexer = Indexer(elastic_search)
+searcher = Searcher(elastic_search)
 
 class Server(object):
     def __init__(self):
         self.db = MongoClient().data.service
-        self.classifier = Classifier(None)
-        self.classifier.load(DATA_MODEL_PATH)
+        self.classifier = MyRandomForest({}, {}, DATA_MODEL_PATH)
+        self.classifier.load()
 
     ################ Stuff for use in this file ################
 
@@ -36,7 +42,7 @@ class Server(object):
             if force:
                 found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
                 for col in found_columns:
-                    Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                    Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
                 self.db.delete_many(db_body)
             else:
                 return "Column already exists", 409
@@ -53,13 +59,13 @@ class Server(object):
         :param data:         The data to predict based opon
         :return: A list of dictionaries which each contain the semantic type and confidence score
         """
-        att = Attribute(column_name, source_names[0])
+        att = Column(column_name, source_names[0])
         print data
         print data[0].splitlines()
         for value in data[0].splitlines():
             att.add_value(value)
-        return att.predict_type(INDEX_NAME, source_names, Searcher.search_attribute_data(INDEX_NAME, source_names),
-                                self.classifier, CONFIDENCE)
+        att.prepare_data()
+        return att.predict_type(INDEX_NAME, Searcher.search_types_data(INDEX_NAME, source_names), Searcher.search_similar_text_data(INDEX_NAME, att.value_text, source_names), self.classifier)
 
     def _update_bulk_add_model(self, model, column_model):
         """
@@ -236,7 +242,7 @@ class Server(object):
                 # Remove the columns from the semantic labeler
                 found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
                 for col in found_columns:
-                    Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                    Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
                 # Remove the columns from the db
                 self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id})
                 self.db.delete_many(db_body)
@@ -266,7 +272,7 @@ class Server(object):
         if delete_all:
             found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}))
             for col in found_columns:
-                Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE,
                                                                          DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
@@ -302,7 +308,7 @@ class Server(object):
             found_columns = list(self.db.find(db_body))
             print found_columns
             for col in found_columns:
-                Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+                Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             self.db.delete_many(db_body)
             deleted = self.db.delete_many(
                 {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
@@ -345,12 +351,13 @@ class Server(object):
         :param force:       True if the column should be replaced if it already exists
         :return: The id of the newly created with a 201 if it was successful, otherwise an error message with the appropriate error code
         """
+        print data
         result = self._create_column(type_id, column_name, source_name, model, data, force)
         if result[1] == 201 and len(data) > 0:
-            att = Attribute(column_name, source_name, type_id)
+            column = Column(column_name, source_name, type_id)
             for value in data:
-                att.add_value(value)
-            att.save(INDEX_NAME)
+                column.add_value(value)
+        Indexer.index_column(column, column_name, source_name, INDEX_NAME)
         return result
 
     def semantic_types_columns_delete(self, type_id, column_ids=None, column_names=None, source_names=None,
@@ -373,7 +380,7 @@ class Server(object):
         found_columns = list(self.db.find(db_body))
         if len(found_columns) < 1: return "No columns were found with the given parameters", 404
         for col in found_columns:
-            Attribute(col[COLUMN_NAME], col[SOURCE_NAME]).delete(INDEX_NAME)
+            Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
 
         return str(self.db.delete_many(db_body).deleted_count) + " columns deleted successfully", 200
 
@@ -408,11 +415,11 @@ class Server(object):
         if result.matched_count > 1: return "More than one column was found with that id", 500
 
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-        att = Attribute(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
-        if force: att.delete(INDEX_NAME)
+        att = Column(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
+        Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
         for value in body:
             att.add_value(value)
-        att.update(INDEX_NAME)
+        Indexer.index_column(column, column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
 
         return "Column data updated", 201
 
@@ -427,7 +434,7 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-        Attribute(column[COLUMN_NAME], column[SOURCE_NAME]).delete(INDEX_NAME)
+        Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
         return "Column data deleted", 200
 
     ################ BulkAddModels ################
@@ -528,12 +535,16 @@ class Server(object):
         :return: The amount of models deleted with a 200 if successful, otherwise an error message with the appropriate code
         """
         db_body = {DATA_TYPE: DATA_TYPE_MODEL}
-        if model_ids is not None: db_body[ID] = {"$in": model_ids}
-        if model_names is not None: db_body[NAME] = {"$in": model_names}
-        if model_desc is not None: db_body[MODEL_DESC] = model_desc
+        if model_ids is not None:
+            db_body[ID] = {"$in": model_ids}
+        if model_names is not None:
+            db_body[NAME] = {"$in": model_names}
+        if model_desc is not None:
+            db_body[MODEL_DESC] = model_desc
         deleted_count = self.db.delete_many(db_body).deleted_count
 
-        if deleted_count < 1: return "No models were found with the given parameters", 404
+        if deleted_count < 1:
+            return "No models were found with the given parameters", 404
         return str(deleted_count) + " models deleted successfully", 200
 
     ################ BulkAddModelData ################
@@ -547,8 +558,10 @@ class Server(object):
         :return: The current state of the bulk add model
         """
         db_result = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
-        if len(db_result) < 1: return "A model was not found with the given id", 404
-        if len(db_result) > 1: return "More than one model was found with the given id", 500
+        if len(db_result) < 1:
+            return "A model was not found with the given id", 404
+        if len(db_result) > 1:
+            return "More than one model was found with the given id", 500
         db_result = db_result[0]
         return json_response(
             self._update_bulk_add_model(db_result[BULK_ADD_MODEL_DATA], db_result[MODEL]) if crunch_data else db_result[
@@ -565,8 +578,10 @@ class Server(object):
         """
         # Get the model and parse the json lines
         model = list(self.db.find({DATA_TYPE: DATA_TYPE_MODEL, ID: model_id}))
-        if len(model) < 1: return "The given model was not found", 404
-        if len(model) > 1: return "More than one model was found with the id", 500
+        if len(model) < 1:
+            return "The given model was not found", 404
+        if len(model) > 1:
+            return "More than one model was found with the id", 500
         model = model[0][BULK_ADD_MODEL_DATA]
         # Get all of the data in each column
         for n in model[BAC_GRAPH][BAC_NODES]:

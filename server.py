@@ -511,7 +511,7 @@ class SemanticTypeColumns(Resource):
             source_name = args.pop(SOURCE_NAME, None)
             model = args.pop(MODEL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceName' was omitted and they are both required"
             if model is None: model = DEFAULT_MODEL
             data = request.data.split(
                 "\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" else []
