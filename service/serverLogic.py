@@ -42,7 +42,7 @@ class Server(object):
             if force:
                 found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
                 for col in found_columns:
-                    Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
+                    indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
                 self.db.delete_many(db_body)
             else:
                 return "Column already exists", 409
@@ -64,8 +64,9 @@ class Server(object):
         print data[0].splitlines()
         for value in data[0].splitlines():
             att.add_value(value)
+        att.semantic_type = "to_predict"
         att.prepare_data()
-        return att.predict_type(INDEX_NAME, Searcher.search_types_data(INDEX_NAME, source_names), Searcher.search_similar_text_data(INDEX_NAME, att.value_text, source_names), self.classifier)
+        return att.predict_type(searcher.search_types_data(INDEX_NAME, source_names), searcher.search_similar_text_data(INDEX_NAME, att.value_text, source_names), self.classifier)
 
     def _update_bulk_add_model(self, model, column_model):
         """
@@ -144,13 +145,14 @@ class Server(object):
             all_allowed_ids = allowed_ids_models
         return_body = []
         for t in prediction:
+            print t
             # Construct the new return body
             if all_allowed_ids is not None:
                 if t[SL_SEMANTIC_TYPE] not in all_allowed_ids:
                     continue
             o = collections.OrderedDict()
-            o[TYPE_ID_PATH] = t[SL_SEMANTIC_TYPE]
-            o[SCORE] = t[SL_CONFIDENCE_SCORE]
+            o[TYPE_ID_PATH] = t[1]
+            o[SCORE] = t[0]
             return_body.append(o)
         return json_response(return_body, 200)
 
@@ -242,7 +244,7 @@ class Server(object):
                 # Remove the columns from the semantic labeler
                 found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
                 for col in found_columns:
-                    Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
+                    indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
                 # Remove the columns from the db
                 self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id})
                 self.db.delete_many(db_body)
@@ -272,7 +274,7 @@ class Server(object):
         if delete_all:
             found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}))
             for col in found_columns:
-                Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
+                indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE,
                                                                          DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
@@ -308,7 +310,7 @@ class Server(object):
             found_columns = list(self.db.find(db_body))
             print found_columns
             for col in found_columns:
-                Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
+                indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             self.db.delete_many(db_body)
             deleted = self.db.delete_many(
                 {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
@@ -354,10 +356,11 @@ class Server(object):
         print data
         result = self._create_column(type_id, column_name, source_name, model, data, force)
         if result[1] == 201 and len(data) > 0:
-            column = Column(column_name, source_name, type_id)
+            column = Column(column_name, source_name)
+            column.semantic_type = type_id
             for value in data:
                 column.add_value(value)
-        Indexer.index_column(column, column_name, source_name, INDEX_NAME)
+            indexer.index_column(column, source_name, INDEX_NAME)
         return result
 
     def semantic_types_columns_delete(self, type_id, column_ids=None, column_names=None, source_names=None,
@@ -380,7 +383,7 @@ class Server(object):
         found_columns = list(self.db.find(db_body))
         if len(found_columns) < 1: return "No columns were found with the given parameters", 404
         for col in found_columns:
-            Indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
+            indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
 
         return str(self.db.delete_many(db_body).deleted_count) + " columns deleted successfully", 200
 
@@ -416,10 +419,10 @@ class Server(object):
 
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         att = Column(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
-        Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+        indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
         for value in body:
             att.add_value(value)
-        Indexer.index_column(column, column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+        indexer.index_column(column, column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
 
         return "Column data updated", 201
 
@@ -434,7 +437,7 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-        Indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+        indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
         self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         return "Column data deleted", 200
 
