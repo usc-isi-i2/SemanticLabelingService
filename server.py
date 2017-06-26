@@ -48,7 +48,7 @@ class parameters(object):
     def class_(required=False):
         return {
             "name": CLASS,
-            "description": "Uri of a class",
+            "description": "Name of a class",
             "required": required,
             "allowMultiple": False,
             "dataType": "string",
@@ -59,7 +59,7 @@ class parameters(object):
     def property(required=False):
         return {
             "name": PROPERTY,
-            "description": "Uri of a property",
+            "description": "Name of a property",
             "required": required,
             "allowMultiple": False,
             "dataType": "string",

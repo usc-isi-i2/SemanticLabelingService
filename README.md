@@ -6,8 +6,11 @@ Use this service to predict types of data after giving training data, see "Using
 ##Software Requirements
 * Python 2.7 - [Download](https://www.python.org/downloads/)
 	* Pip - If you're on Ubuntu just install "python-pip"
+
 * MongoDB - If you're on Ubuntu just install "mongodb-server"
+
 * Elasticsearch - [Download](https://www.elastic.co/downloads/elasticsearch)
+
 * Apache Spark - [Download](http://spark.apache.org/downloads.html)
 	* This can be a pain to get to work properly, you may find the sample code below to put in you `~/.bashrc` or `~/.bash_profile` helpful, just don't forget to change the two {{path to spark}} and {{version number}}:<pre>
 export PATH={{path to spark}}/bin:$PATH
@@ -15,13 +18,31 @@ export SPARK_HOME="{{path to spark}}"
 export PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/build:$PYTHONPATH
 export PYTHONPATH=$SPARK_HOME/python/lib/py4j-{{version number}}-src.zip:$PYTHONPATH
 </pre>
+
 * SemanticLabeling - Install using "pip install git+https://github.com/usc-isi-i2/SemanticLabelingAlgorithm.git"
 
+* Elastic2DocManager - Install using <pre>pip install elastic2-doc-manager</pre>  or <pre>
+git clone https://github.com/mongodb-labs/elastic2-doc-manager
+cd elastic2-doc-manager
+python setup.py install
+</pre>
+
+* MongoConnector - Install using <pre>pip install mongo-connector</pre>  or <pre>
+cd your/installation/directory
+git clone https://github.com/mongodb-labs/mongo-connector.git
+cd mongo-connector
+python setup.py install_service
+</pre>
 
 ##Running the service
-1. Start MongoDB by running "mongod" in the terminal
-2. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
-3. Run "server.py"
+1. Start MongoDB in replicaSet by running <pre>mongod --replSet "rs0"</pre> in the terminal
+2. connect Mongo Shell to replicaSet by <pre>mongo</pre>
+3. Initiate the replica set by <pre> rs.initiate()</pre>
+4. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
+5. Create a connection between MongoDb and ElasticSearch using <pre>mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v</pre>
+6. You will probably not kill the process (ctrl+c) if you are deploying ES in the staging/production so you will need to create a background process to avoid losing the connection between your db and ES when you end the ssh session, to do that use - <pre>nohup mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v > /dev/null 2>&1 & </pre>
+    - For any queries with respect to steps 1-6, refer to this blog - https://madhacker.me/use-mongodb-and-elasticsearch-2/
+7. Run "server.py"
 	- If you get a "No module named pyspark" error your Apache Spark is not configured correctly
 	- If you get a "No module named {package name here}" error just run "pip install {insert name here}" in terminal, just make sure pip is installing to the correct python installation if you have more than one
 

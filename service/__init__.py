@@ -6,7 +6,7 @@ from flask import Response
 
 ######## General Constants #########
 DATA_MODEL_PATH = "model/lr.pkl"  # File path for the model used by the semantic labeling
-INDEX_NAME = "index_name"  # The index_name for use when saving attributes
+INDEX_NAME = "data"  # The index_name for use when saving attributes
 DEFAULT_NAME = "default"  # Just a name for using when there isn't one
 DEFAULT_MODEL = "default"  # Default model name for use when one isn't provided
 DEFAULT_BULK_MODEL = "bulk_add"  # Default model for columns added using bulk add
@@ -138,12 +138,12 @@ def clean_column_output(column, show_data=True):
     :return: An OrderedDict of the column
     """
     o = collections.OrderedDict()
-    o[COLUMN_ID_PATH] = column[ID]
+    o[COLUMN_ID_PATH] = str(column[ID])
     o[NAME] = column[COLUMN_NAME]
     o[SOURCE] = column[SOURCE_NAME]
     o[MODEL] = column[MODEL]
     if show_data:
-        o[DATA] = column[DATA]
+        o[DATA] = column["values"]
     return o
 
 
