@@ -13,6 +13,7 @@ DEFAULT_BULK_MODEL = "bulk_add"  # Default model for columns added using bulk ad
 NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'  # Characters not allowed by elastic search
 ID_DIVIDER = "-"  # The divider that is used to separate the different parts of ID's, like class and property
 CONFIDENCE = 0.1  # Semantic types which have a confidence of lower than this number on predict will not be returned
+SAMPLE_SIZE = 1000 #if the size of the training data is MORE than this threshold value, then sample this threshold values randomly
 
 ######## Mongodb Names ########
 ID = "_id"  # ID for any entry in the db

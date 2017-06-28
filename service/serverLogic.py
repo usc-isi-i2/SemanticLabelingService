@@ -1,6 +1,7 @@
 import validators
 from elasticsearch import Elasticsearch
 from pymongo import MongoClient
+import random
 from semantic_labeling.lib.column import Column
 from semantic_labeling.lib.source import Source
 from semantic_labeling.main.random_forest import MyRandomForest
@@ -338,6 +339,10 @@ class Server(object):
         """
         column = Column(column_name, source_name)
         column.semantic_type = type_id
+
+        #if the size of the training data is MORE than a threshold value, then sample the threshold values randomly
+        if(len(data)>SAMPLE_SIZE): data = random.sample(data, SAMPLE_SIZE)
+
         for value in data:
             column.add_value(value)
         result = self._create_column(column, type_id, column_name, source_name, model, force)
