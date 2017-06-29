@@ -6,13 +6,14 @@ from flask import Response
 
 ######## General Constants #########
 DATA_MODEL_PATH = "model/lr.pkl"  # File path for the model used by the semantic labeling
-INDEX_NAME = "index_name"  # The index_name for use when saving attributes
+INDEX_NAME = "data"  # The index_name for use when saving attributes
 DEFAULT_NAME = "default"  # Just a name for using when there isn't one
 DEFAULT_MODEL = "default"  # Default model name for use when one isn't provided
 DEFAULT_BULK_MODEL = "bulk_add"  # Default model for columns added using bulk add
 NOT_ALLOWED_CHARS = '[\\/*?"<>|\s\t]'  # Characters not allowed by elastic search
 ID_DIVIDER = "-"  # The divider that is used to separate the different parts of ID's, like class and property
 CONFIDENCE = 0.1  # Semantic types which have a confidence of lower than this number on predict will not be returned
+SAMPLE_SIZE = 1000 #if the size of the training data is MORE than this threshold value, then sample this threshold values randomly
 
 ######## Mongodb Names ########
 ID = "_id"  # ID for any entry in the db
@@ -138,12 +139,12 @@ def clean_column_output(column, show_data=True):
     :return: An OrderedDict of the column
     """
     o = collections.OrderedDict()
-    o[COLUMN_ID_PATH] = column[ID]
+    o[COLUMN_ID_PATH] = str(column[ID])
     o[NAME] = column[COLUMN_NAME]
     o[SOURCE] = column[SOURCE_NAME]
     o[MODEL] = column[MODEL]
     if show_data:
-        o[DATA] = column[DATA]
+        o[DATA] = column["values"]
     return o
 
 

@@ -1,6 +1,7 @@
 import validators
 from elasticsearch import Elasticsearch
 from pymongo import MongoClient
+import random
 from semantic_labeling.lib.column import Column
 from semantic_labeling.lib.source import Source
 from semantic_labeling.main.random_forest import MyRandomForest
@@ -21,7 +22,7 @@ class Server(object):
 
     ################ Stuff for use in this file ################
 
-    def _create_column(self, type_id, column_name, source_name, model, data=[], force=False):
+    def _create_column(self, column, type_id, column_name, source_name, model, force=False):
         """
         Create a column in a semantic type and return the column's id if it was created successfully.
 
@@ -40,13 +41,10 @@ class Server(object):
                    SOURCE_NAME: source_name, MODEL: model}
         if self.db.find_one(db_body):
             if force:
-                found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
-                for col in found_columns:
-                    indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
                 self.db.delete_many(db_body)
             else:
                 return "Column already exists", 409
-        db_body[DATA] = data
+        db_body.update(column.to_json())
         self.db.insert_one(db_body)
         return column_id, 201
 
@@ -233,7 +231,6 @@ class Server(object):
 
         ## Verify that class is a valid uri and namespace is a valid uri
         namespace = "/".join(class_.replace("#", "/").split("/")[:-1])
-        if not validators.url(class_) or not validators.url(namespace): return "Invalid class URI was given", 400
 
         ## Actually add the type
         type_id = get_type_id(class_, property_)
@@ -241,11 +238,6 @@ class Server(object):
                    NAMESPACE: namespace}
         if self.db.find_one(db_body):
             if force:
-                # Remove the columns from the semantic labeler
-                found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}))
-                for col in found_columns:
-                    indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
-                # Remove the columns from the db
                 self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id})
                 self.db.delete_many(db_body)
             else:
@@ -271,10 +263,6 @@ class Server(object):
         """
         if class_ is None and property_ is None and type_ids is None and namespaces is None and source_names is None and column_names is None and column_ids is None and models is None and not delete_all:
             return "To delete all semantic types give deleteAll as true", 400
-        if delete_all:
-            found_columns = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN}))
-            for col in found_columns:
-                indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE,
                                                                          DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
@@ -307,10 +295,6 @@ class Server(object):
                 if id_ not in possible_types:
                     type_ids_to_delete.remove(id_)
             db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: {"$in": type_ids_to_delete}}
-            found_columns = list(self.db.find(db_body))
-            print found_columns
-            for col in found_columns:
-                indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
             self.db.delete_many(db_body)
             deleted = self.db.delete_many(
                 {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, ID: {"$in": type_ids_to_delete}}).deleted_count
@@ -353,14 +337,15 @@ class Server(object):
         :param force:       True if the column should be replaced if it already exists
         :return: The id of the newly created with a 201 if it was successful, otherwise an error message with the appropriate error code
         """
-        print data
-        result = self._create_column(type_id, column_name, source_name, model, data, force)
-        if result[1] == 201 and len(data) > 0:
-            column = Column(column_name, source_name)
-            column.semantic_type = type_id
-            for value in data:
-                column.add_value(value)
-            indexer.index_column(column, source_name, INDEX_NAME)
+        column = Column(column_name, source_name)
+        column.semantic_type = type_id
+
+        #if the size of the training data is MORE than a threshold value, then sample the threshold values randomly
+        if(len(data)>SAMPLE_SIZE): data = random.sample(data, SAMPLE_SIZE)
+
+        for value in data:
+            column.add_value(value)
+        result = self._create_column(column, type_id, column_name, source_name, model, force)
         return result
 
     def semantic_types_columns_delete(self, type_id, column_ids=None, column_names=None, source_names=None,
@@ -382,9 +367,6 @@ class Server(object):
         if models is not None: db_body[MODEL] = {"$in": models}
         found_columns = list(self.db.find(db_body))
         if len(found_columns) < 1: return "No columns were found with the given parameters", 404
-        for col in found_columns:
-            indexer.delete_column(col[COLUMN_NAME], col[SOURCE_NAME], INDEX_NAME)
-
         return str(self.db.delete_many(db_body).deleted_count) + " columns deleted successfully", 200
 
     ################ SemanticTypesColumnData ################
@@ -412,17 +394,21 @@ class Server(object):
         :param force:     True if the current data in the column should be replaced, false if the new data should just be appended
         :return: A conformation with a 201 if it was added successfully or an error message with an appropriate error code if it was not successful
         """
-        result = self.db.update_many({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id},
-                                     {"$set" if force else "$pushAll": {DATA: body}})
-        if result.matched_count < 1: return "No column with that id was found", 404
-        if result.matched_count > 1: return "More than one column was found with that id", 500
 
-        column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-        att = Column(column[COLUMN_NAME], column[SOURCE_NAME], get_type_from_column_id(column_id))
-        indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+        column_data = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
+        if column_data.matched_count < 1: return "No column with that id was found", 404
+        if column_data.matched_count > 1: return "More than one column was found with that id", 500
+
+        column = Column(column_data[COLUMN_NAME], column_data[SOURCE_NAME], get_type_from_column_id(column_id))
+        if not force:
+            column.read_json_to_column(column_data)
+
+
         for value in body:
-            att.add_value(value)
-        indexer.index_column(column, column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+            column.add_value(value)
+
+        data = column.to_json()
+        self.db.update_many(data)
 
         return "Column data updated", 201
 
@@ -437,7 +423,9 @@ class Server(object):
         if result.matched_count < 1: return "No column with that id was found", 404
         if result.matched_count > 1: return "More than one column was found with that id", 500
         column = self.db.find_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
-        indexer.delete_column(column[COLUMN_NAME], column[SOURCE_NAME], INDEX_NAME)
+
+        self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: get_type_from_column_id(column_id)})
+
         self.db.delete_one({DATA_TYPE: DATA_TYPE_COLUMN, ID: column_id})
         return "Column data deleted", 200
 
