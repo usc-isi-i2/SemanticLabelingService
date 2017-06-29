@@ -249,7 +249,7 @@ class Server(object):
                 self.db.delete_many({DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id})
                 self.db.delete_many(db_body)
             else:
-                return "Semantic type already exists", 409
+                return type_id, 409
         self.db.insert_one(db_body)
         return type_id, 201
 
