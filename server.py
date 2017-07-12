@@ -36,13 +36,26 @@ class parameters(object):
     @staticmethod
     def type_id(required=False, multiple=True, param_type="query"):
         return {
-            "name": TYPE_ID_PATH if param_type == "path" else TYPE_IDS if multiple else TYPE_ID,
+            "name": TYPE_ID_INPUT_PATH,
+            "enum": ["typeID","class&&property"],
             "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
             "required": required,
             "allowMultiple": multiple,
             "dataType": "string",
-            "paramType": param_type
+            "paramType": "query"
         }
+
+    @staticmethod
+    def type_id_value(required=False, multiple=True, param_type="query"):
+        return {
+            "name": TYPE_ID_VALUE_PATH if param_type == "path" else TYPE_ID_VALUE_PATHS if multiple else TYPE_ID_VALUE_PATH,
+            "description": "Ids of the semantic types or name of class and property (name&&property)" if multiple else "Id of the semantic type or name of class and property (name&&property)",
+            "required": required,
+            "allowMultiple": multiple,
+            "dataType": "string",
+            "paramType": "query"
+        }
+
 
     @staticmethod
     def class_(required=False):
@@ -396,6 +409,7 @@ class SemanticTypes(Resource):
     @swagger.operation(
         parameters=[
             parameters.type_id(),
+            parameters.type_id_value(),
             parameters.class_(),
             parameters.property(),
             parameters.namespaces(),
@@ -424,7 +438,25 @@ class SemanticTypes(Resource):
             if len(args) < 1: return "At least one argument needs to be provided", 400
             class_ = args.pop(CLASS, None)
             property_ = args.pop(PROPERTY, None)
-            type_ids = args.pop(TYPE_IDS).split(",") if args.get(TYPE_IDS) else None
+            type_input = args.pop(TYPE_ID_INPUT_PATH,None)
+            type_id_values = args.pop(TYPE_ID_VALUE_PATHS).split(",") if args.get(TYPE_ID_VALUE_PATHS) else None
+
+            if str(type_input) == "class&&property":
+                type_ids = []
+                if type_id_values is not None:
+                    for type_id_value in type_id_values:
+                        try:
+                            _class=type_id_value.split("&&")[0]
+                            _property=type_id_value.split("&&")[1]
+                            type_ids.append(get_type_id(_class,_property))
+                        except:
+                            return "Invalid format of class&&property", 400
+            else:
+                type_ids = type_id_values
+
+            if type_id_values is not None and type_input is None:
+                return "Type input needs to be selected", 400
+            if len(type_ids)==0: type_ids=None
             namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
@@ -442,6 +474,7 @@ class SemanticTypeColumns(Resource):
     @swagger.operation(
         parameters=[
             parameters.type_id(True, False, "path"),
+            parameters.type_id_value(True, False, "path"),
             parameters.column_ids(desc="The ids of the column(s) to be returned"),
             parameters.source_names(),
             parameters.column_names(desc="The names of the column(s) to be returned"),
@@ -474,8 +507,19 @@ class SemanticTypeColumns(Resource):
         Note that giving no parameters will return all columns with no data.
         """
         try:
-            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
             args = request.args.copy()
+            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
+            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
+            if str(type_id)=="class&&property":
+                try:
+                    _class=type_id_value.split("&&")[0]
+                    _property=type_id_value.split("&&")[1]
+                    type_id=get_type_id(_class, _property)
+                except:
+                    return "Invalid format of class&&property", 400
+            else:
+                type_id=type_id_value
             column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
@@ -491,6 +535,7 @@ class SemanticTypeColumns(Resource):
     @swagger.operation(
         parameters=[
             parameters.type_id(True, False, "path"),
+            parameters.type_id_value(True, False,"path"),
             parameters.column_names(True, "Name of the column to be created", False),
             parameters.source_names(True, "Name of the source of the column to be created", False),
             parameters.models(False, "Model of the column to be created, if none is given 'default' will be used",
@@ -504,9 +549,22 @@ class SemanticTypeColumns(Resource):
         Add a column to a semantic type
         Creates the column and returns the id
         """
+
         try:
-            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
             args = request.args.copy()
+            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
+            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
+            if str(type_id) == "class&&property":
+                try:
+                    class_=type_id_value.split("&&")[0]
+                    property_=type_id_value.split("&&")[1]
+                    type_id=get_type_id(class_,property_)
+                except:
+                    return "Invalid format of class&&property", 400
+            else:
+                type_id = type_id_value
+            
             column_name = args.pop(COLUMN_NAME, None)
             source_name = args.pop(SOURCE_NAME, None)
             model = args.pop(MODEL, None)
@@ -522,6 +580,7 @@ class SemanticTypeColumns(Resource):
     @swagger.operation(
         parameters=[
             parameters.type_id(True, False, "path"),
+            parameters.type_id_value(True, False, "path"),
             parameters.column_names(True, "Name of the column to be created", False),
             parameters.source_names(True, "Name of the source of the column to be created", False),
             parameters.models(False, "Model of the column to be created, if none is given 'default' will be used",
@@ -536,8 +595,19 @@ class SemanticTypeColumns(Resource):
         Creates the column if it does not exist and replaces the column if it does, then returns the id if the column.
         """
         try:
-            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
             args = request.args.copy()
+            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
+            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
+            if str(type_id)=="class&&property":
+                try:
+                    class_=type_id_value.split("&&")[0]
+                    property_=type_id_value.split("&&")[1]
+                    type_id=get_type_id(class_,property_)
+                except:
+                    return "Invalid format of class&&property", 400
+            else:
+                type_id=type_id_value
             column_name = args.pop(COLUMN_NAME, None)
             source_name = args.pop(SOURCE_NAME, None)
             model = args.pop(MODEL, None)
@@ -553,6 +623,7 @@ class SemanticTypeColumns(Resource):
     @swagger.operation(
         parameters=[
             parameters.type_id(True, False, "path"),
+            parameters.type_id_value(True, False, "path"),
             parameters.column_ids(desc="The ids of the column(s) to be deleted"),
             parameters.source_names(),
             parameters.column_names(desc="The names of the column(s) to be deleted"),
@@ -566,8 +637,19 @@ class SemanticTypeColumns(Resource):
         Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
         """
         try:
-            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
             args = request.args.copy()
+            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
+            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
+            if str(type_id)=="class&&property":
+                try:
+                    class_=type_id_value.split("&&")[0]
+                    property_=type_id_value.split("&&")[1]
+                    type_id=get_type_id(class_,property_)
+                except:
+                    return "Invalid format of class&&property", 400
+            else:
+                type_id=type_id_value
             column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None

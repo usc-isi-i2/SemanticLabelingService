@@ -151,6 +151,14 @@ class Server(object):
             o = collections.OrderedDict()
             o[TYPE_ID_PATH] = t[1]
             o[SCORE] = t[0]
+            _class = []
+            _property = []
+            for id in t[1]:
+                type_class_property = decode_type_id(id)
+                _class.append(type_class_property[0])
+                _property.append(type_class_property[1])
+            o[CLASS]= _class
+            o[PROPERTY] = _property
             return_body.append(o)
         return json_response(return_body, 200)
 
@@ -266,29 +274,43 @@ class Server(object):
             return "All " + str(self.db.delete_many({DATA_TYPE: {"$in": [DATA_TYPE_SEMANTIC_TYPE,
                                                                          DATA_TYPE_COLUMN]}}).deleted_count) + " semantic types and their data were deleted", 200
 
+
+        print str(class_)+" "+str(property_)+" "+str(type_ids)+" "+str(namespaces)+" "+str(source_names)+" "+str(column_names)+" "+str(column_ids)+" "+str(models)+" "+str(delete_all)
+
         # Find the parent semantic types and everything below them of everything which meets column requirements
         type_ids_to_delete = []
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN}
-        if type_ids is not None: db_body[TYPE_IDS] = {"$in": type_ids}
+        db_body_id = {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE}
+        if type_ids is not None:
+            db_body[TYPE_ID] = {"$in": type_ids}
+            db_body_id[ID] = {"$in": type_ids}
+
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}
         if column_ids is not None: db_body[COLUMN_ID_PATH] = {"$in": column_ids}
         if models is not None: db_body[MODEL] = {"$in": models}
         for col in self.db.find(db_body):
+            print "col[TYPE_ID] = "+str(col[TYPE_ID])
             if col[TYPE_ID] not in type_ids_to_delete:
                 type_ids_to_delete.append(col[TYPE_ID])
-
+        for col in self.db.find(db_body_id):
+            print "col[ID] = "+str(col[ID])
+            if col[ID] not in type_ids_to_delete:
+                type_ids_to_delete.append(col[ID])
         # Find the semantic types which meet the other requirements and delete all types which need to be
         possible_types = []
         db_body = {DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE}
         if class_ is not None: db_body[CLASS] = class_
         if property_ is not None: db_body[PROPERTY] = property_
         if namespaces is not None: db_body[NAMESPACE] = {"$in": namespaces}
-        print db_body
-        if source_names is None and column_names is None and column_ids is None and models is None:
+
+        if type_ids is None and source_names is None and column_names is None and column_ids is None and models is None:
             deleted = self.db.delete_many(db_body).deleted_count
         else:
             for t in self.db.find(db_body):
+                if t[ID] not in possible_types:
+                    possible_types.append(t[ID])
+            for t in self.db.find(db_body_id):
                 if t[ID] not in possible_types:
                     possible_types.append(t[ID])
             for id_ in type_ids_to_delete:

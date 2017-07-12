@@ -49,9 +49,11 @@ SL_SEMANTIC_TYPE = "semantic_type"
 
 ######## Path Parameters ########
 COLUMN_ID_PATH = "column_id"
-TYPE_ID_PATH = "type_id"
+TYPE_ID_INPUT_PATH = "inputType"
+TYPE_ID_PATH="type_id"
+TYPE_ID_VALUE_PATH = "type_id"
+TYPE_ID_VALUE_PATHS = "typeIds"
 MODEL_ID_PATH = "model_id"
-TYPE_IDS = "typeIds"
 
 ######## Query Parameters ########
 CLASS = "class"
