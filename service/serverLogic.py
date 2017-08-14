@@ -64,6 +64,7 @@ class Server(object):
             att.add_value(value)
         att.semantic_type = "to_predict"
         att.prepare_data()
+        print(INDEX_NAME)
         return att.predict_type(searcher.search_types_data(INDEX_NAME, source_names), searcher.search_similar_text_data(INDEX_NAME, att.value_text, source_names), self.classifier)
 
     def _update_bulk_add_model(self, model, column_model):
@@ -107,6 +108,10 @@ class Server(object):
         :param data:         List of the data values to predict.
         :return: A return message (if it is successful this will be a list of the predicted types) and a return code
         """
+        data = [x.strip() for x in data]
+        data = [x for x in data if x]
+        if not data:
+            return "Predicting data cannot be empty", 500
         if source_names is None:
             # If no source names are given just use all of the source names in the db
             source_names = set()
@@ -117,8 +122,8 @@ class Server(object):
 
         #### Predict the types
         ## Do the actual predicting using the semantic labeler
-        prediction = self._predict_column(column_names[0], source_names, data)
-        if len(prediction) < 1: return "No matches found", 404
+        predictions = self._predict_column(column_names[0], source_names, data)
+        if len(predictions) < 1: return "No matches found", 404
 
         ## Filter the results
         allowed_ids_namespaces = None
@@ -128,8 +133,8 @@ class Server(object):
             allowed_ids_namespaces = set()
             current_allowed_types = list(
                 self.db.find({DATA_TYPE: DATA_TYPE_SEMANTIC_TYPE, NAMESPACE: {"$in": namespaces}}))
-            for t in current_allowed_types:
-                allowed_ids_namespaces.add(t[ID])
+            for prediction in current_allowed_types:
+                allowed_ids_namespaces.add(prediction[ID])
         if models:
             allowed_ids_models = set()
             current_allowed_types = list(self.db.find({DATA_TYPE: DATA_TYPE_COLUMN, MODEL: {"$in": models}}))
@@ -142,24 +147,18 @@ class Server(object):
         elif allowed_ids_namespaces is None and allowed_ids_models is not None:
             all_allowed_ids = allowed_ids_models
         return_body = []
-        for t in prediction:
-            print t
-            # Construct the new return body
-            if all_allowed_ids is not None:
-                if t[SL_SEMANTIC_TYPE] not in all_allowed_ids:
-                    continue
-            o = collections.OrderedDict()
-            o[TYPE_ID_PATH] = t[1]
-            o[SCORE] = t[0]
-            _class = []
-            _property = []
-            for id in t[1]:
-                type_class_property = decode_type_id(id)
-                _class.append(type_class_property[0])
-                _property.append(type_class_property[1])
-            o[CLASS]= _class
-            o[PROPERTY] = _property
-            return_body.append(o)
+        for prediction in predictions:
+            print(prediction)
+            for type_id, exact_score in prediction[1]:
+                if all_allowed_ids is not None:
+                    if prediction[SL_SEMANTIC_TYPE] not in all_allowed_ids:
+                        continue
+                obj_dict = {TYPE_ID_PATH: type_id, SCORE: exact_score}
+                type_class_property = decode_type_id(type_id)
+                obj_dict[CLASS] = type_class_property[0]
+                obj_dict[PROPERTY] = type_class_property[1]
+                return_body.append(obj_dict)
+        return_body.sort(key=lambda x: x[SCORE], reverse=True)
         return json_response(return_body, 200)
 
     ################ SemanticTypes ################
@@ -338,6 +337,7 @@ class Server(object):
         :param return_column_data: True if all of the data in the column should be returned with the columns
         :return: All of the columns in the semantic type that fit the given parameters
         """
+        print(type_id)
         db_body = {DATA_TYPE: DATA_TYPE_COLUMN, TYPE_ID: type_id}
         if source_names is not None: db_body[SOURCE_NAME] = {"$in": source_names}
         if column_names is not None: db_body[COLUMN_NAME] = {"$in": column_names}

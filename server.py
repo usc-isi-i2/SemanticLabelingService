@@ -16,19 +16,32 @@ service = service.serverLogic.Server()
 
 
 ################################################################################################################################
-#                                                                                                                              #
-#  This class is only used for what gets called by the API and swagger docs.  There isn't any logic code here aside from the   #
-#  try/catch for returning 500's and verifying parameters since I think it would be messy and harder to maintain.  It's all    #
-#  in service/serverLogic.py                                                                                                   #
-#                                                                                                                              #
-#  All of the constant values used here are set in service/__init__.py                                                         #
-#                                                                                                                              #
-#  Each of the API functions in this class should call a helper function in the Server class of serverLogic.py whose name      #
-#  follows the form of {class_name}_{type}, where {class_name} is the name of the class in this file, but with underscores     #
-#  instead of camelCase and {type} is the HTTP method name, such as GET or DELETE.  Example: semantic_types_get()              #
-#  Note that POST and PUT call the same method since the code for each of them is nearly identical.  These follow the form:    #
-#  {class_name}_post_put().  Example: semantic_types_post_put()                                                                #
-#                                                                                                                              #
+#
+#           #
+#  This class is only used for what gets called by the API and swagger docs.  There isn't any logic code here aside
+# from the   #
+#  try/catch for returning 500's and verifying parameters since I think it would be messy and harder to maintain.
+# It's all    #
+#  in service/serverLogic.py
+#           #
+#
+#           #
+#  All of the constant values used here are set in service/__init__.py
+#           #
+#
+#           #
+#  Each of the API functions in this class should call a helper function in the Server class of serverLogic.py whose
+# name      #
+#  follows the form of {class_name}_{type}, where {class_name} is the name of the class in this file,
+# but with underscores     #
+#  instead of camelCase and {type} is the HTTP method name, such as GET or DELETE.  Example: semantic_types_get()
+#           #
+#  Note that POST and PUT call the same method since the code for each of them is nearly identical.  These follow the
+#  form:    #
+#  {class_name}_post_put().  Example: semantic_types_post_put()
+#           #
+#
+#           #
 ################################################################################################################################
 
 
@@ -37,8 +50,8 @@ class parameters(object):
     def type_id(required=False, multiple=True, param_type="query"):
         return {
             "name": TYPE_ID_INPUT_PATH,
-            "enum": ["typeID","class&&property"],
-            "description": "Ids of the semantic types" if multiple else "Id of the semantic type",
+            "enum": ["typeID", "class&&property"],
+            "description": "Format of id" if multiple else "Format of ids",
             "required": required,
             "allowMultiple": multiple,
             "dataType": "string",
@@ -48,14 +61,15 @@ class parameters(object):
     @staticmethod
     def type_id_value(required=False, multiple=True, param_type="query"):
         return {
-            "name": TYPE_ID_VALUE_PATH if param_type == "path" else TYPE_ID_VALUE_PATHS if multiple else TYPE_ID_VALUE_PATH,
-            "description": "Ids of the semantic types or name of class and property (name&&property)" if multiple else "Id of the semantic type or name of class and property (name&&property)",
+            "name": TYPE_ID_VALUE_PATH if param_type == "path" else TYPE_ID_VALUE_PATHS if multiple else
+            TYPE_ID_VALUE_PATH,
+            "description": "Id or name (class&&property) of the semantic type" if multiple
+            else "Ids or names (""class&&property) of the semantic types",
             "required": required,
             "allowMultiple": multiple,
             "dataType": "string",
             "paramType": "query"
         }
-
 
     @staticmethod
     def class_(required=False):
@@ -148,7 +162,8 @@ class parameters(object):
 
     @staticmethod
     def body(required=False,
-             desc="List of data values which will be inserted into the column (one per line), all lines will be included as values, including blank ones"):
+             desc="List of data values which will be inserted into the column (one per line), all lines will be "
+                  "included as values, including blank ones"):
         return {
             "name": BODY,
             "description": desc,
@@ -206,7 +221,8 @@ class parameters(object):
     def crunch_data():
         return {
             "name": DO_NOT_CRUNCH_DATA_NOW,
-            "description": "If this is true, the model will not be evaluated and whatever is currently stored will be used",
+            "description": "If this is true, the model will not be evaluated and whatever is currently stored will be "
+                           "used",
             "required": False,
             "allowMultiple": False,
             "dataType": "boolean",
@@ -265,7 +281,8 @@ class Predict(Resource):
     def post(self):
         """
         Predict the semantic type of data
-        Predicts the semantic type of the given data.  Returns a list of types in the following format (sorted from most to least likely):
+        Predicts the semantic type of the given data.  Returns a list of types in the following format (sorted from
+        most to least likely):
         <pre>
         [
             {
@@ -275,7 +292,9 @@ class Predict(Resource):
         ]
         </pre>
         """
+        print("request data", request.data)
         try:
+            print("request data", request.data)
             if request.data is None or request.data == "": return "Invalid message body", 400
             args = request.args.copy()
             namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
@@ -285,7 +304,8 @@ class Predict(Resource):
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_names is None: column_names = [DEFAULT_NAME]
             return service.predict_post(request.data.split(","), namespaces, column_names, source_names, models)
-        except:
+        except Exception as e:
+            print(e)
             return str(traceback.format_exc()), 500
 
 
@@ -308,7 +328,8 @@ class SemanticTypes(Resource):
                 "paramType": "query"
             },
             parameters.return_column_data(
-                "If the data in the columns should be in the return body, if this is true it will override returnColumns")
+                "If the data in the columns should be in the return body, if this is true it will override "
+                "returnColumns")
         ],
         responseMessages=responses.standard_get()
     )
@@ -317,7 +338,8 @@ class SemanticTypes(Resource):
         Get semantic types
         Returns all of the semantic types which fit the given parameters.
 
-        Returned body will have the following format, but if returnColumns or returnColumnData is not given as true, then "columns" will be omitted and if returnDataColumns is not given as true "data" will be omitted:
+        Returned body will have the following format, but if returnColumns or returnColumnData is not given as true,
+        then "columns" will be omitted and if returnDataColumns is not given as true "data" will be omitted:
         <pre>
         [
             {
@@ -355,8 +377,10 @@ class SemanticTypes(Resource):
             return_columns = args.pop(RETURN_COLUMNS, None)
             return_column_data = args.pop(RETURN_COLUMN_DATA, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
-            return_columns = True if return_columns is not None and return_columns.lower() == "true" else return_column_data
+            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else \
+                False
+            return_columns = True if return_columns is not None and return_columns.lower() == "true" else \
+                return_column_data
             return service.semantic_types_get(class_, property_, namespaces, source_names, column_names, column_ids,
                                               models, return_columns, return_column_data)
         except:
@@ -394,7 +418,8 @@ class SemanticTypes(Resource):
     def put(self):
         """
         Create/Replace a semantic type
-        Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that replacing a semantic type will remove all of it's columns.
+        Creates a semantic type if it doesn't exist or replaces it if it does, then returns its id.  Note that
+        replacing a semantic type will remove all of it's columns.
         """
         try:
             args = request.args.copy()
@@ -431,14 +456,15 @@ class SemanticTypes(Resource):
     def delete(self):
         """
         Delete a semantic type
-        Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
+        Deletes all semantic types which match the given parameters.  Note that if no parameters are given a 400 will
+        be returned.  If deleteAll is true, all semantic types will be deleted regardless of other parameters.
         """
         try:
             args = request.args.copy()
             if len(args) < 1: return "At least one argument needs to be provided", 400
             class_ = args.pop(CLASS, None)
             property_ = args.pop(PROPERTY, None)
-            type_input = args.pop(TYPE_ID_INPUT_PATH,None)
+            type_input = args.pop(TYPE_ID_INPUT_PATH, None)
             type_id_values = args.pop(TYPE_ID_VALUE_PATHS).split(",") if args.get(TYPE_ID_VALUE_PATHS) else None
 
             if str(type_input) == "class&&property":
@@ -446,9 +472,9 @@ class SemanticTypes(Resource):
                 if type_id_values is not None:
                     for type_id_value in type_id_values:
                         try:
-                            _class=type_id_value.split("&&")[0]
-                            _property=type_id_value.split("&&")[1]
-                            type_ids.append(get_type_id(_class,_property))
+                            _class = type_id_value.split("&&")[0]
+                            _property = type_id_value.split("&&")[1]
+                            type_ids.append(get_type_id(_class, _property))
                         except:
                             return "Invalid format of class&&property", 400
             else:
@@ -456,7 +482,7 @@ class SemanticTypes(Resource):
 
             if type_id_values is not None and type_input is None:
                 return "Type input needs to be selected", 400
-            if len(type_ids)==0: type_ids=None
+            if len(type_ids) == 0: type_ids = None
             namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
@@ -473,8 +499,8 @@ class SemanticTypes(Resource):
 class SemanticTypeColumns(Resource):
     @swagger.operation(
         parameters=[
-            parameters.type_id(True, False, "path"),
-            parameters.type_id_value(True, False, "path"),
+            parameters.type_id(True, False),
+            # parameters.type_id_value(True, False, "path"),
             parameters.column_ids(desc="The ids of the column(s) to be returned"),
             parameters.source_names(),
             parameters.column_names(desc="The names of the column(s) to be returned"),
@@ -488,7 +514,8 @@ class SemanticTypeColumns(Resource):
         Get the columns in a semantic type
         Returns all of the columns in a semantic type that match the given parameters.
 
-        Returned body will have the following format, but if returnColumnData is not given as true, "data" will be omitted:
+        Returned body will have the following format, but if returnColumnData is not given as true, "data" will be
+        omitted:
         <pre>
         [
             {
@@ -508,25 +535,24 @@ class SemanticTypeColumns(Resource):
         """
         try:
             args = request.args.copy()
-            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
-            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
-            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
-            if str(type_id)=="class&&property":
+            format_type = args.pop(TYPE_ID_INPUT_PATH, None)
+            # type_id = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            if str(format_type) == "class&&property":
                 try:
-                    _class=type_id_value.split("&&")[0]
-                    _property=type_id_value.split("&&")[1]
-                    type_id=get_type_id(_class, _property)
+                    _class = type_id.split("&&")[0]
+                    _property = type_id.split("&&")[1]
+                    type_id = get_type_id(_class, _property)
                 except:
                     return "Invalid format of class&&property", 400
-            else:
-                type_id=type_id_value
             column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
             models = args.pop(MODELS).split(",") if args.get(MODELS) else None
             return_column_data = args.pop(RETURN_COLUMN_DATA, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else False
+            return_column_data = True if return_column_data is not None and return_column_data.lower() == "true" else \
+                False
             return service.semantic_types_columns_get(type_id, column_ids, column_names, source_names, models,
                                                       return_column_data)
         except:
@@ -534,8 +560,8 @@ class SemanticTypeColumns(Resource):
 
     @swagger.operation(
         parameters=[
-            parameters.type_id(True, False, "path"),
-            parameters.type_id_value(True, False,"path"),
+            parameters.type_id(True, False),
+            # parameters.type_id_value(True, False, "path"),
             parameters.column_names(True, "Name of the column to be created", False),
             parameters.source_names(True, "Name of the source of the column to be created", False),
             parameters.models(False, "Model of the column to be created, if none is given 'default' will be used",
@@ -552,35 +578,34 @@ class SemanticTypeColumns(Resource):
 
         try:
             args = request.args.copy()
-            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
-            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
-            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
-            if str(type_id) == "class&&property":
+            format_type = args.pop(TYPE_ID_INPUT_PATH, None)
+            # type_id = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            if str(format_type) == "class&&property":
                 try:
-                    class_=type_id_value.split("&&")[0]
-                    property_=type_id_value.split("&&")[1]
-                    type_id=get_type_id(class_,property_)
+                    class_ = type_id.split("&&")[0]
+                    property_ = type_id.split("&&")[1]
+                    type_id = get_type_id(class_, property_)
                 except:
                     return "Invalid format of class&&property", 400
-            else:
-                type_id = type_id_value
-            
             column_name = args.pop(COLUMN_NAME, None)
             source_name = args.pop(SOURCE_NAME, None)
             model = args.pop(MODEL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceName' was omitted and they are both required"
+            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceName' was omitted " \
+                                                                  "and they are both required"
             if model is None: model = DEFAULT_MODEL
             data = request.data.split(
-                "\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" else []
+                "\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" \
+                else []
             return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, data, False)
         except:
             return str(traceback.format_exc()), 500
 
     @swagger.operation(
         parameters=[
-            parameters.type_id(True, False, "path"),
-            parameters.type_id_value(True, False, "path"),
+            parameters.type_id(True, False),
+            # parameters.type_id_value(True, False, "path"),
             parameters.column_names(True, "Name of the column to be created", False),
             parameters.source_names(True, "Name of the source of the column to be created", False),
             parameters.models(False, "Model of the column to be created, if none is given 'default' will be used",
@@ -596,34 +621,34 @@ class SemanticTypeColumns(Resource):
         """
         try:
             args = request.args.copy()
-            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
-            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
-            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
-            if str(type_id)=="class&&property":
+            format_type = args.pop(TYPE_ID_INPUT_PATH, None)
+            # type_id = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            if str(format_type) == "class&&property":
                 try:
-                    class_=type_id_value.split("&&")[0]
-                    property_=type_id_value.split("&&")[1]
-                    type_id=get_type_id(class_,property_)
+                    class_ = type_id.split("&&")[0]
+                    property_ = type_id.split("&&")[1]
+                    type_id = get_type_id(class_, property_)
                 except:
                     return "Invalid format of class&&property", 400
-            else:
-                type_id=type_id_value
             column_name = args.pop(COLUMN_NAME, None)
             source_name = args.pop(SOURCE_NAME, None)
             model = args.pop(MODEL, None)
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
-            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted and they are both required"
+            if column_name is None or source_name is None: return "Either 'columnName' or 'sourceColumn' was omitted " \
+                                                                  "and they are both required"
             if model is None: model = DEFAULT_MODEL
             data = request.data.split(
-                "\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" else []
+                "\n") if request.data is not None and request.data.strip() != "" and request.data.strip() != "{}" \
+                else []
             return service.semantic_types_columns_post_put(type_id, column_name, source_name, model, data, False)
         except:
             return str(traceback.format_exc()), 500
 
     @swagger.operation(
         parameters=[
-            parameters.type_id(True, False, "path"),
-            parameters.type_id_value(True, False, "path"),
+            parameters.type_id(True, False),
+            # parameters.type_id_value(True, False, "path"),
             parameters.column_ids(desc="The ids of the column(s) to be deleted"),
             parameters.source_names(),
             parameters.column_names(desc="The names of the column(s) to be deleted"),
@@ -634,22 +659,21 @@ class SemanticTypeColumns(Resource):
     def delete(self, type_id):
         """
         Delete a column from a semantic type
-        Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in that semantic type are deleted.
+        Deletes all columns which match the given parameters.  Note that if no parameters are given all columns in
+        that semantic type are deleted.
         """
         try:
             args = request.args.copy()
-            type_id = args.pop(TYPE_ID_INPUT_PATH, None)
-            type_id_value = args.pop(TYPE_ID_VALUE_PATH, None)
-            if type_id_value is None or len(type_id_value) < 1: return "Invalid type_id", 400
-            if str(type_id)=="class&&property":
+            format_type = args.pop(TYPE_ID_INPUT_PATH, None)
+            # type_id = args.pop(TYPE_ID_VALUE_PATH, None)
+            if type_id is None or len(type_id) < 1: return "Invalid type_id", 400
+            if str(format_type) == "class&&property":
                 try:
-                    class_=type_id_value.split("&&")[0]
-                    property_=type_id_value.split("&&")[1]
-                    type_id=get_type_id(class_,property_)
+                    class_ = type_id.split("&&")[0]
+                    property_ = type_id.split("&&")[1]
+                    type_id = get_type_id(class_, property_)
                 except:
                     return "Invalid format of class&&property", 400
-            else:
-                type_id=type_id_value
             column_ids = args.pop(COLUMN_IDS).split(",") if args.get(COLUMN_IDS) else None
             column_names = args.pop(COLUMN_NAMES).split(",") if args.get(COLUMN_NAMES) else None
             source_names = args.pop(SOURCE_NAMES).split(",") if args.get(SOURCE_NAMES) else None
@@ -662,7 +686,7 @@ class SemanticTypeColumns(Resource):
 
 class SemanticTypeColumnData(Resource):
     @swagger.operation(
-        parameters=[parameters.column_ids(True, "The ids of the column to get the info on", False, "path")],
+        # parameters=[parameters.column_ids(True, "The id of the column to get the info on", False, "path")],
         responseMessages=responses.standard_get()
     )
     def get(self, column_id):
@@ -694,7 +718,7 @@ class SemanticTypeColumnData(Resource):
 
     @swagger.operation(
         parameters=[
-            parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
+            # parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
             parameters.body(True)
         ],
         responseMessages=responses.standard_post()
@@ -714,7 +738,7 @@ class SemanticTypeColumnData(Resource):
 
     @swagger.operation(
         parameters=[
-            parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
+            # parameters.column_ids(True, "The ids of the column to add the data to", False, "path"),
             parameters.body(True)
         ],
         responseMessages=responses.standard_put()
@@ -733,7 +757,7 @@ class SemanticTypeColumnData(Resource):
             return str(traceback.format_exc()), 500
 
     @swagger.operation(
-        parameters=[parameters.column_ids(True, "The ids of the column to remove the data from", False, "path")],
+        # parameters=[parameters.column_ids(True, "The ids of the column to remove the data from", False, "path")],
         responseMessages=responses.standard_delete(),
     )
     def delete(self, column_id):
@@ -770,7 +794,12 @@ class BulkAddModels(Resource):
     def get(self):
         """
         Get bulk add models
-        Returns all of the models which fit all of the given parameters (and all of them if no parameters are given).  If showAllData is true then the current state of each of the model.json files, otherwise "model" will be omitted.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db will be updated as well as returned as long as showAllData is true.  Return body will have the following format:
+        Returns all of the models which fit all of the given parameters (and all of them if no parameters are given).
+         If showAllData is true then the current state of each of the model.json files, otherwise "model" will be
+         omitted.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now,
+         instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a
+         model with this set to false (or not given at all) the model in the db will be updated as well as returned
+         as long as showAllData is true.  Return body will have the following format:
         <pre>
         [
             {
@@ -808,7 +837,9 @@ class BulkAddModels(Resource):
     def post(self):
         """
         Add a bulk add model
-        Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the model is the id assigned to it, so it is not returned and must be unique.  The semantic types and columns given in the model will be created when this is sent.
+        Add a bulk add model for adding information through POST /models/{model_id}, note that the id listed in the
+        model is the id assigned to it, so it is not returned and must be unique.  The semantic types and columns
+        given in the model will be created when this is sent.
         """
         try:
             if request.data is None or len(request.data) < 1: return "Invalid message body", 400
@@ -831,7 +862,8 @@ class BulkAddModels(Resource):
     def delete(self):
         """
         Remove a bulk add model
-        Removes all models which fit all of the given parameters.  Note that if no parameters are given all models will be removed, but the semantic types and data inside them will be left intact.
+        Removes all models which fit all of the given parameters.  Note that if no parameters are given all models
+        will be removed, but the semantic types and data inside them will be left intact.
         """
         try:
             args = request.args.copy()
@@ -855,7 +887,10 @@ class BulkAddModelData(Resource):
     def get(self, model_id):
         """
         Gets the current state of a bulk add model
-        Returns the current state of the given bulk add model id.  If doNotCrunchDataNow is true, the learned semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db will be updated as well as returned.
+        Returns the current state of the given bulk add model id.  If doNotCrunchDataNow is true, the learned
+        semantic types will not be generated now, instead whatever is in the db will be used, which may or may not be
+        current.  Every time a GET is run on a model with this set to false (or not given at all) the model in the db
+        will be updated as well as returned.
         """
         try:
             if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
@@ -880,7 +915,9 @@ class BulkAddModelData(Resource):
     def post(self, model_id):
         """
         Add data to the semantic types
-        Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file, with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add data to columns, but faster for large amounts of data.
+        Adds data from jsonlines into the semantic types.  Each line of the body should be a full json file,
+        with everything specified in the model.json.  This is the same as using POST /semantic_types/{type_id} to add
+        data to columns, but faster for large amounts of data.
         """
         try:
             if model_id is None or len(model_id) < 1: return "Invalid model_id", 400
