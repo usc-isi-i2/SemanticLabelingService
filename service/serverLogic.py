@@ -58,13 +58,12 @@ class Server(object):
         :return: A list of dictionaries which each contain the semantic type and confidence score
         """
         att = Column(column_name, source_names[0])
-        print data
-        print data[0].splitlines()
-        for value in data[0].splitlines():
+
+        # print(data)
+        for value in data:
             att.add_value(value)
         att.semantic_type = "to_predict"
         att.prepare_data()
-        print(INDEX_NAME)
         return att.predict_type(searcher.search_types_data(INDEX_NAME, source_names), searcher.search_similar_text_data(INDEX_NAME, att.value_text, source_names), self.classifier)
 
     def _update_bulk_add_model(self, model, column_model):

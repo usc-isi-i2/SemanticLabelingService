@@ -292,9 +292,9 @@ class Predict(Resource):
         ]
         </pre>
         """
-        print("request data", request.data)
+        # print("request data", request.data)
         try:
-            print("request data", request.data)
+            # print("request data", request.data)
             if request.data is None or request.data == "": return "Invalid message body", 400
             args = request.args.copy()
             namespaces = args.pop(NAMESPACES).split(",") if args.get(NAMESPACES) else None
@@ -303,7 +303,7 @@ class Predict(Resource):
             models = args.pop(MODEL).split(",") if args.get(MODEL) else None
             if len(args) > 0: return "The following query parameters are invalid:  " + str(args.keys()), 400
             if column_names is None: column_names = [DEFAULT_NAME]
-            return service.predict_post(request.data.split(","), namespaces, column_names, source_names, models)
+            return service.predict_post(request.data.splitlines(), namespaces, column_names, source_names, models)
         except Exception as e:
             print(e)
             return str(traceback.format_exc()), 500
