@@ -48,7 +48,9 @@ rsconf = {
                    ]
         }
 
-rs.initiate(rsconf)</pre>
+rs.initiate(rsconf)
+
+</pre>
 4. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
 5. Create a connection between MongoDb and ElasticSearch using <pre>mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v</pre>
 6. You will probably not kill the process (ctrl+c) if you are deploying ES in the staging/production so you will need to create a background process to avoid losing the connection between your db and ES when you end the ssh session, to do that use - <pre>nohup mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v > /dev/null 2>&1 & </pre>
