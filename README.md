@@ -37,7 +37,18 @@ python setup.py install_service
 ## Running the service
 1. Start MongoDB in replicaSet by running <pre>mongod --replSet "rs0"</pre> in the terminal
 2. connect Mongo Shell to replicaSet by <pre>mongo</pre>
-3. Initiate the replica set by <pre> rs.initiate()</pre>
+3. Initiate the replica set by <pre> 
+rsconf = {
+          _id: “rs0”,
+          members: [
+                     {
+                      _id: 0,
+                      host: “127.0.0.1:27017"
+                     }
+                   ]
+        }
+rs.initiate(rsconf)
+</pre>
 4. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
 5. Create a connection between MongoDb and ElasticSearch using <pre>mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v</pre>
 6. You will probably not kill the process (ctrl+c) if you are deploying ES in the staging/production so you will need to create a background process to avoid losing the connection between your db and ES when you end the ssh session, to do that use - <pre>nohup mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v > /dev/null 2>&1 & </pre>
