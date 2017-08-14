@@ -47,9 +47,7 @@ rsconf = {
                      }
                    ]
         }
-
 rs.initiate(rsconf)
-
 </pre>
 4. Start Elasticsearch by running the "elasticsearch" in "bin" in your elasticsearch directory
 5. Create a connection between MongoDb and ElasticSearch using <pre>mongo-connector -m localhost:27017 -t localhost:9200 -d elastic2_doc_manager -v</pre>
